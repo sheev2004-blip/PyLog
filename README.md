@@ -10,3 +10,4 @@ A Python command-line log analysis tool that summarizes log levels, validates lo
 - Skips unknown log levels
 - Handles missing files gracefully
 - Counts repeated log messages
+
