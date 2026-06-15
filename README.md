@@ -1,6 +1,6 @@
 # PyLog
 
-A Python command-line log analysis tool that summarizes log levels, validates log line format, handles missing files, and reports message frequency.
+A Python command-line log analysis tool that summarizes log levels, validates log line format, handles missing files, and reports message frequency. Also detects suspicious activity based on thresholds.
 
 ## Current Features
 
@@ -10,4 +10,5 @@ A Python command-line log analysis tool that summarizes log levels, validates lo
 - Skips unknown log levels
 - Handles missing files gracefully
 - Counts repeated log messages
+- Suspicious activity detection
 

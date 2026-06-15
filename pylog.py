@@ -50,7 +50,7 @@ def analyze_log(filename):
                     info_count += 1 
         return info_count, warning_count, error_count, malformed_count, unknown_count, message_counts
     except FileNotFoundError:
-        print("Error: File not found.")
+        print("Error: File not found:", filename)
         sys.exit(1)
 
 def detect_suspicious_activity(message_counts):
