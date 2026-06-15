@@ -60,65 +60,49 @@ def detect_suspicious_activity(message_counts):
             suspicious_activity.append((message, count))
     return suspicious_activity
 
-def print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
-    print("Log Summary")
-    print("-----------")
-    print("ERROR:", error_count)
-    print("WARNING:", warning_count)
-    print("INFO:", info_count)
-    print("Malformed Lines Skipped:", malformed_count)
-    print("Unknown Levels Skipped:", unknown_count)
-    print()
-    print("Message Counts:")
-    print("---------------")
+def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
+    lines = []
+    lines.append(f"Source File: {filename}\n")
+    lines.append("Log Summary")
+    lines.append("-----------")
+    lines.append(f"ERROR: {error_count}")
+    lines.append(f"WARNING: {warning_count}")
+    lines.append(f"INFO: {info_count}")
+    lines.append(f"Malformed Lines Skipped: {malformed_count}")
+    lines.append(f"Unknown Levels Skipped: {unknown_count}")
+    lines.append('')
+    lines.append("Message Counts:")
+    lines.append("---------------")
 
     sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
 
     for message, count in sorted_messages:
-        print(f"{message}: {count}")
-    print()
-    print("Suspicious Activity:")
-    print("-------------------")
+        lines.append(f"{message}: {count}")
+    lines.append('')
+
+    lines.append("Suspicious Activity:")
+    lines.append("--------------------")
     if suspicious_activity:
         for message, count in suspicious_activity:
-            print(f"{message} occurred {count} times")
+            lines.append(f"{message} occurred {count} times")
     else:
-        print("None detected.")
+        lines.append("None detected.")
+    summary = '\n'.join(lines)
+    return summary
 
-def export_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
+def print_summary(summary):
+    print(summary)
+
+def export_summary(summary):
     with open("summary.txt", "w") as file:
-        file.write(f"Source File: {filename}\n\n")
-        file.write("Log Summary\n")
-        file.write("-----------\n")
-        file.write(f"ERROR: {error_count}\n")
-        file.write(f"WARNING: {warning_count}\n")
-        file.write(f"INFO: {info_count}\n")
-        file.write(f"Malformed Lines Skipped: {malformed_count}\n")
-        file.write(f"Unknown Levels Skipped: {unknown_count}\n")
-        file.write('\n')
-        file.write("Message Counts:\n")
-        file.write("---------------\n")
-        
-        sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
-
-        for message, count in sorted_messages:
-            file.write(f"{message}: {count}\n")
-        file.write('\n')
-
-        file.write("Suspicious Activity:\n")
-        file.write("--------------------\n")
-        if suspicious_activity:
-            for message, count in suspicious_activity:
-                file.write(f"{message} occurred {count} times\n")
-        else:
-            file.write("None detected.\n")
-    print("Summary exported to summary.txt")
+        file.write(summary)
 
 def main():
     filename = get_filename()
     info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
     suspicious_activity = detect_suspicious_activity(message_counts)
-    print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
-    export_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
+    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
+    print_summary(summary)
+    export_summary(summary)
 if __name__ == "__main__":
     main()
