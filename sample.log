@@ -4,8 +4,8 @@
 bad line 
 2026-06-12 WARNING Low disk space
 2026-06-12 INFO User logged out
-2026-06-12 Poo Uhhhh...
-2026-06-12 POO
+2026-06-12 ALERT Uhhhh...
+2026-06-12 ERROR Failed login
 2026-06-12 WARNING Low disk space
 2026-06-12 WARNING Low disk space
 2026-06-12 WARNING Low disk space

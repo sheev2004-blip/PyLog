@@ -1,5 +1,7 @@
 import sys
 
+FAILED_LOGIN_THRESHOLD = 3
+
 def get_filename():
     if len(sys.argv) != 2:
         print("Usage: python pylog.py <logfile>")
@@ -18,11 +20,13 @@ def analyze_log(filename):
         with open(filename) as file:
             for line in file:
                 line = line.strip()
+                if not line:
+                    continue
                 parts = line.split(maxsplit=2)
 
                 if len(parts) < 3:
                     malformed_count += 1
-                    print("Skipping malformed line:", line.strip())
+                    print("Skipping malformed line:", line)
                     continue
 
                 level = parts[1]
@@ -49,7 +53,14 @@ def analyze_log(filename):
         print("Error: File not found.")
         sys.exit(1)
 
-def print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts):
+def detect_suspicious_activity(message_counts):
+    suspicious_activity = []
+    for message, count in message_counts.items():
+        if "failed login" in message.lower() and count >= FAILED_LOGIN_THRESHOLD:
+            suspicious_activity.append((message, count))
+    return suspicious_activity
+
+def print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
     print("Log Summary")
     print("-----------")
     print("ERROR:", error_count)
@@ -57,6 +68,7 @@ def print_summary(info_count, warning_count, error_count, malformed_count, unkno
     print("INFO:", info_count)
     print("Malformed Lines Skipped:", malformed_count)
     print("Unknown Levels Skipped:", unknown_count)
+    print()
     print("Message Counts:")
     print("---------------")
 
@@ -64,11 +76,21 @@ def print_summary(info_count, warning_count, error_count, malformed_count, unkno
 
     for message, count in sorted_messages:
         print(f"{message}: {count}")
+    print()
+    print("Suspicious Activity:")
+    print("-------------------")
+    if suspicious_activity:
+        for message, count in suspicious_activity:
+            print(f"{message} occurred {count} times")
+    else:
+        print("None detected.")
+
 
 def main():
     filename = get_filename()
     info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
-    print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts)
+    suspicious_activity = detect_suspicious_activity(message_counts)
+    print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
 
 if __name__ == "__main__":
     main()
