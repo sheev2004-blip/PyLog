@@ -85,12 +85,40 @@ def print_summary(info_count, warning_count, error_count, malformed_count, unkno
     else:
         print("None detected.")
 
+def export_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
+    with open("summary.txt", "w") as file:
+        file.write(f"Source File: {filename}\n\n")
+        file.write("Log Summary\n")
+        file.write("-----------\n")
+        file.write(f"ERROR: {error_count}\n")
+        file.write(f"WARNING: {warning_count}\n")
+        file.write(f"INFO: {info_count}\n")
+        file.write(f"Malformed Lines Skipped: {malformed_count}\n")
+        file.write(f"Unknown Levels Skipped: {unknown_count}\n")
+        file.write('\n')
+        file.write("Message Counts:\n")
+        file.write("---------------\n")
+        
+        sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
+
+        for message, count in sorted_messages:
+            file.write(f"{message}: {count}\n")
+        file.write('\n')
+
+        file.write("Suspicious Activity:\n")
+        file.write("--------------------\n")
+        if suspicious_activity:
+            for message, count in suspicious_activity:
+                file.write(f"{message} occurred {count} times\n")
+        else:
+            file.write("None detected.\n")
+    print("Summary exported to summary.txt")
 
 def main():
     filename = get_filename()
     info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
     suspicious_activity = detect_suspicious_activity(message_counts)
     print_summary(info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
-
+    export_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
 if __name__ == "__main__":
     main()
