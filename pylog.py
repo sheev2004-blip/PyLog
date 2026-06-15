@@ -1,12 +1,23 @@
 import sys
 
+from matplotlib import lines
+
 FAILED_LOGIN_THRESHOLD = 3
 
-def get_filename():
-    if len(sys.argv) != 2:
-        print("Usage: python pylog.py <logfile>")
+def get_options():
+    export_enabled = False
+
+    if len(sys.argv) == 2:
+        return sys.argv[1], export_enabled, None 
+    elif len(sys.argv) == 3 and sys.argv[2] == "--export":
+        export_enabled = True
+        return sys.argv[1], export_enabled, "summary.txt"
+    elif len(sys.argv) == 4 and sys.argv[2] == "--export":
+        export_enabled = True
+        return sys.argv[1], export_enabled, sys.argv[3]
+    else:
+        print("Usage: python pylog.py <logfile> [--export [output_file]]")
         sys.exit(1)
-    return sys.argv[1]
 
 def analyze_log(filename):
     error_count = 0
@@ -60,9 +71,10 @@ def detect_suspicious_activity(message_counts):
             suspicious_activity.append((message, count))
     return suspicious_activity
 
-def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
+def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity, export_filename):
     lines = []
-    lines.append(f"Source File: {filename}\n")
+    lines.append(f"Source File: {filename}")
+    lines.append("")
     lines.append("Log Summary")
     lines.append("-----------")
     lines.append(f"ERROR: {error_count}")
@@ -87,22 +99,25 @@ def build_summary(filename, info_count, warning_count, error_count, malformed_co
             lines.append(f"{message} occurred {count} times")
     else:
         lines.append("None detected.")
+
     summary = '\n'.join(lines)
     return summary
 
 def print_summary(summary):
     print(summary)
 
-def export_summary(summary):
-    with open("summary.txt", "w") as file:
+def export_summary(summary, export_filename):
+    with open(export_filename, "w") as file:
         file.write(summary)
 
 def main():
-    filename = get_filename()
+    filename, export_enabled, export_filename = get_options()
     info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
     suspicious_activity = detect_suspicious_activity(message_counts)
-    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
+    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity, export_filename)
     print_summary(summary)
-    export_summary(summary)
+    if export_enabled: 
+        export_summary(summary, export_filename)
+        print(f"Summary exported to {export_filename}")
 if __name__ == "__main__":
     main()
