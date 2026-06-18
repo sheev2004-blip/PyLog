@@ -32,6 +32,8 @@ Example:
 * Sorts message counts from most common to least common
 * Detects repeated failed login messages
 * Optionally exports the summary to a text file
+* Uses argparse for command-line options
+* Allows configurable failed-login threshold
 
 ## Technologies Used
 
@@ -68,6 +70,12 @@ Export to a custom report file:
 python pylog.py sample.log --export report.txt
 ```
 
+Set a custom failed login threshold:
+
+```bash
+python pylog.py sample.log --threshold 5
+```
+
 ## Example Output
 
 ```text
@@ -94,12 +102,12 @@ Failed login occurred 3 times
 
 ## Suspicious Activity Detection
 
-PyLog currently flags repeated failed login messages when they occur at least three times.
+PyLog currently flags repeated failed login messages when they occur at least three times, or however many times indicated by the user's custom threshold.
 
 Current detection rule:
 
 ```text
-Message contains "failed login" and count >= 3
+Message contains "failed login" and count >= 3 (or custom number)
 ```
 
 This is a simple rule-based detection feature intended to demonstrate basic log analysis and security monitoring concepts.
