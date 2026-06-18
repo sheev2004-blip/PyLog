@@ -11,6 +11,9 @@ def get_options():
 )
     args = parser.parse_args()
 
+    if args.threshold < 1:
+        parser.error("Threshold must be at least 1.")
+
     return args.logfile, args.export is not None, args.export, args.threshold
 
 def analyze_log(filename):
