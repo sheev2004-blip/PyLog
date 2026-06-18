@@ -1,4 +1,4 @@
-from pylog import detect_suspicious_activity, build_summary
+from pylog import detect_suspicious_activity, build_summary, analyze_log
 
 def test_detects_failed_logins_at_threshold():
     message_counts = {
@@ -88,3 +88,44 @@ def test_build_summary_sorts_message_counts_by_frequency():
     disk_index = summary.index("Low disk space: 1")
 
     assert failed_index < login_index < disk_index
+
+def test_analyze_log_counts_valid_entries(tmp_path):
+    log_file = tmp_path / "fake.log"
+    log_file.write_text(
+        "2026-06-12 INFO Login successful\n"
+        "2026-06-12 ERROR Failed login\n"
+        "2026-06-12 ERROR Failed login\n"
+        "2026-06-12 WARNING Low disk space\n"
+        "bad line\n"
+        "2026-06-12 DEBUG Debug message\n"
+    )
+    info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(log_file)
+    assert info_count == 1
+    assert warning_count == 1
+    assert error_count == 2
+    assert malformed_count == 1
+    assert unknown_count == 1
+
+    assert message_counts["Login successful"] == 1
+    assert message_counts["Failed login"] == 2
+    assert message_counts["Low disk space"] == 1
+    assert "Debug message" not in message_counts
+
+def test_analyze_log_handles_blank_lines(tmp_path):
+    log_file = tmp_path / "fake.log"
+    log_file.write_text(
+        "2026-06-12 INFO Login successful\n"
+        "\n"
+        "2026-06-12 ERROR Failed login\n"
+        "\n"
+        "2026-06-12 WARNING Low disk space\n"
+    ) 
+    info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(log_file)
+    
+    assert info_count == 1
+    assert warning_count == 1
+    assert error_count == 1
+    assert malformed_count == 0
+    assert unknown_count == 0
+
+
