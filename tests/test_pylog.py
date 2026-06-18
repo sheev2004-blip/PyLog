@@ -1,4 +1,4 @@
-from pylog import detect_suspicious_activity
+from pylog import detect_suspicious_activity, build_summary
 
 def test_detects_failed_logins_at_threshold():
     message_counts = {
@@ -28,3 +28,63 @@ def test_detects_failed_logins_case_insensitive():
     result = detect_suspicious_activity(message_counts, 3)
 
     assert result == [("FAILED LOGIN", 4)]
+
+def test_build_summary_includes_log_counts():
+    summary = build_summary(
+        filename = "sample.log",
+        info_count = 2,
+        warning_count = 1,
+        error_count = 3,
+        malformed_count = 0,
+        unknown_count = 1,
+        message_counts = {
+            "Failed login": 3,
+            "Login successful": 2,
+            "Low disk space": 1 
+        },
+        suspicious_activity = [("Failed login", 3)]
+    )
+
+    assert "Source File: sample.log" in summary
+    assert "ERROR: 3" in summary
+    assert "WARNING: 1" in summary
+    assert "INFO: 2" in summary
+    assert "Malformed Lines Skipped: 0" in summary
+    assert "Unknown Levels Skipped: 1" in summary
+
+def test_build_summary_includes_suspicious_activity():
+    summary = build_summary(
+        filename = "sample.log",
+        info_count = 1,
+        warning_count = 0,
+        error_count = 0,
+        malformed_count = 0,
+        unknown_count = 0,
+        message_counts = {"Login successful": 1},
+        suspicious_activity = []
+    )
+
+    assert "Suspicious Activity:" in summary 
+    assert "None detected." in summary
+
+def test_build_summary_sorts_message_counts_by_frequency():
+    summary = build_summary(
+        filename="sample.log",
+        info_count=0,
+        warning_count=0,
+        error_count=0,
+        malformed_count=0,
+        unknown_count=0,
+        message_counts={
+            "Low disk space": 1,
+            "Failed login": 3,
+            "Login successful": 2
+        },
+        suspicious_activity=[]
+    )
+
+    failed_index = summary.index("Failed login: 3")
+    login_index = summary.index("Login successful: 2")
+    disk_index = summary.index("Low disk space: 1")
+
+    assert failed_index < login_index < disk_index
