@@ -112,6 +112,15 @@ Message contains "failed login" and count >= 3 (or custom number)
 
 This is a simple rule-based detection feature intended to demonstrate basic log analysis and security monitoring concepts.
 
+## Testing
+
+PyLog includes automated tests using `pytest`.
+
+Run the test suite from the project root:
+
+```bash
+python -m pytest
+
 ## Project Structure
 
 ```text
