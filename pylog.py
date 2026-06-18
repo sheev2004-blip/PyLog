@@ -1,23 +1,17 @@
 import sys
-
-from matplotlib import lines
-
-FAILED_LOGIN_THRESHOLD = 3
+import argparse
 
 def get_options():
-    export_enabled = False
+    parser =  argparse.ArgumentParser(
+        description="Analyze log files and generate summary reports."
+    )
+    parser.add_argument("logfile", help="Path to the log file to analyze")
+    parser.add_argument("--export", nargs="?", const="summary.txt", help="Export the summary to a file")
+    parser.add_argument("--threshold", type=int, default=3, help="Number of failed login attempts needed to trigger an alert"
+)
+    args = parser.parse_args()
 
-    if len(sys.argv) == 2:
-        return sys.argv[1], export_enabled, None 
-    elif len(sys.argv) == 3 and sys.argv[2] == "--export":
-        export_enabled = True
-        return sys.argv[1], export_enabled, "summary.txt"
-    elif len(sys.argv) == 4 and sys.argv[2] == "--export":
-        export_enabled = True
-        return sys.argv[1], export_enabled, sys.argv[3]
-    else:
-        print("Usage: python pylog.py <logfile> [--export [output_file]]")
-        sys.exit(1)
+    return args.logfile, args.export is not None, args.export, args.threshold
 
 def analyze_log(filename):
     error_count = 0
@@ -64,14 +58,14 @@ def analyze_log(filename):
         print("Error: File not found:", filename)
         sys.exit(1)
 
-def detect_suspicious_activity(message_counts):
+def detect_suspicious_activity(message_counts, threshold):
     suspicious_activity = []
     for message, count in message_counts.items():
-        if "failed login" in message.lower() and count >= FAILED_LOGIN_THRESHOLD:
+        if "failed login" in message.lower() and count >= threshold:
             suspicious_activity.append((message, count))
     return suspicious_activity
 
-def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity, export_filename):
+def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
     lines = []
     lines.append(f"Source File: {filename}")
     lines.append("")
@@ -111,13 +105,14 @@ def export_summary(summary, export_filename):
         file.write(summary)
 
 def main():
-    filename, export_enabled, export_filename = get_options()
+    filename, export_enabled, export_filename, threshold = get_options()
     info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
-    suspicious_activity = detect_suspicious_activity(message_counts)
-    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity, export_filename)
+    suspicious_activity = detect_suspicious_activity(message_counts, threshold)
+    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
     print_summary(summary)
     if export_enabled: 
         export_summary(summary, export_filename)
         print(f"Summary exported to {export_filename}")
+    print(f"Failed login threshold used: {threshold}")
 if __name__ == "__main__":
     main()
