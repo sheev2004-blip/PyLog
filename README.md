@@ -154,10 +154,7 @@ pylog/
 
 * Add support for additional log levels such as `DEBUG` and `CRITICAL`
 * Add more suspicious activity rules
-* Allow users to configure suspicious activity thresholds
 * Support additional log formats
 * Add CSV export
-* Add unit tests
-* Improve command-line option handling with `argparse`
 
 
