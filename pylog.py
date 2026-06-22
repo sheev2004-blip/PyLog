@@ -1,22 +1,28 @@
 import sys
 import argparse
 
+DEFAULT_EXPORT_FILENAME = "summary.txt"
+DEFAULT_THRESHOLD = 3
+FAILED_LOGIN_PHRASE = "failed login"
+VALID_LEVELS = {"INFO", "WARNING", "ERROR"}
+
 def get_options():
     parser =  argparse.ArgumentParser(
         description="Analyze log files and generate summary reports."
     )
     parser.add_argument("logfile", help="Path to the log file to analyze")
-    parser.add_argument("--export", nargs="?", const="summary.txt", help="Export the summary to a file")
-    parser.add_argument("--threshold", type=int, default=3, help="Number of failed login attempts needed to trigger an alert"
-)
+    parser.add_argument("--export", nargs="?", const=DEFAULT_EXPORT_FILENAME, help="Export the summary to a file")
+    parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD, help="Number of failed login attempts needed to trigger an alert")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+
     args = parser.parse_args()
 
     if args.threshold < 1:
         parser.error("Threshold must be at least 1.")
 
-    return args.logfile, args.export is not None, args.export, args.threshold
+    return args.logfile, args.export is not None, args.export, args.threshold, args.verbose
 
-def analyze_log(filename):
+def analyze_log(filename, verbose):
     level_counts = {
     "INFO": 0,
     "WARNING": 0,
@@ -39,14 +45,16 @@ def analyze_log(filename):
 
                 if len(parts) < 3:
                     skipped_counts["malformed"] += 1
-                    print("Skipping malformed line:", line)
+                    if verbose:
+                        print("Skipping malformed line:", line)
                     continue
 
                 level = parts[1]
 
-                if level not in level_counts:
+                if level not in VALID_LEVELS:
                     skipped_counts["unknown_level"] += 1
-                    print("Skipping unknown log level:", level)
+                    if verbose:
+                        print("Skipping unknown log level:", level)
                     continue
 
                 message = parts[2].strip()
@@ -69,7 +77,7 @@ def analyze_log(filename):
 def detect_suspicious_activity(message_counts, threshold):
     suspicious_activity = []
     for message, count in message_counts.items():
-        if "failed login" in message.lower() and count >= threshold:
+        if FAILED_LOGIN_PHRASE in message.lower() and count >= threshold:
             suspicious_activity.append((message, count))
     return suspicious_activity
 
@@ -105,19 +113,16 @@ def build_summary(filename, level_counts, skipped_counts, message_counts, suspic
     summary = '\n'.join(lines)
     return summary
 
-def print_summary(summary):
-    print(summary)
-
 def export_summary(summary, export_filename):
     with open(export_filename, "w") as file:
         file.write(summary)
 
 def main():
-    filename, export_enabled, export_filename, threshold = get_options()
-    level_counts, skipped_counts, message_counts = analyze_log(filename)
+    filename, export_enabled, export_filename, threshold, verbose = get_options()
+    level_counts, skipped_counts, message_counts = analyze_log(filename, verbose)
     suspicious_activity = detect_suspicious_activity(message_counts, threshold)
     summary = build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity)
-    print_summary(summary)
+    print(summary)
     if export_enabled: 
         export_summary(summary, export_filename)
         print(f"Summary exported to {export_filename}")

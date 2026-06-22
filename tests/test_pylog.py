@@ -111,7 +111,7 @@ def test_analyze_log_counts_valid_entries(tmp_path):
         "bad line\n"
         "2026-06-12 DEBUG Debug message\n"
     )
-    level_counts, skipped_counts, message_counts = analyze_log(log_file)
+    level_counts, skipped_counts, message_counts = analyze_log(log_file, verbose=False)
     assert level_counts["INFO"] == 1
     assert level_counts["WARNING"] == 1
     assert level_counts["ERROR"] == 2
@@ -132,7 +132,7 @@ def test_analyze_log_handles_blank_lines(tmp_path):
         "\n"
         "2026-06-12 WARNING Low disk space\n"
     ) 
-    level_counts, skipped_counts, message_counts = analyze_log(log_file)
+    level_counts, skipped_counts, message_counts = analyze_log(log_file, verbose=False)
 
     assert level_counts["INFO"] == 1
     assert level_counts["WARNING"] == 1
