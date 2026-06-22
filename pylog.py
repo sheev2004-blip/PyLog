@@ -17,13 +17,18 @@ def get_options():
     return args.logfile, args.export is not None, args.export, args.threshold
 
 def analyze_log(filename):
-    error_count = 0
-    warning_count = 0
-    info_count = 0
-    malformed_count = 0
-    unknown_count = 0
-    valid_levels = {"INFO", "WARNING", "ERROR"}
+    level_counts = {
+    "INFO": 0,
+    "WARNING": 0,
+    "ERROR": 0
+    }
+
+    skipped_counts = {
+    "malformed": 0,
+    "unknown_level": 0
+}
     message_counts = {}
+    
     try:
         with open(filename) as file:
             for line in file:
@@ -33,14 +38,14 @@ def analyze_log(filename):
                 parts = line.split(maxsplit=2)
 
                 if len(parts) < 3:
-                    malformed_count += 1
+                    skipped_counts["malformed"] += 1
                     print("Skipping malformed line:", line)
                     continue
 
                 level = parts[1]
 
-                if level not in valid_levels:
-                    unknown_count += 1
+                if level not in level_counts:
+                    skipped_counts["unknown_level"] += 1
                     print("Skipping unknown log level:", level)
                     continue
 
@@ -51,12 +56,12 @@ def analyze_log(filename):
                     message_counts[message] += 1
 
                 if level == "ERROR":
-                    error_count += 1
+                    level_counts["ERROR"] += 1
                 elif level == "WARNING":
-                    warning_count += 1
+                    level_counts["WARNING"] += 1
                 elif level == "INFO":
-                    info_count += 1 
-        return info_count, warning_count, error_count, malformed_count, unknown_count, message_counts
+                    level_counts["INFO"] += 1 
+        return level_counts, skipped_counts, message_counts
     except FileNotFoundError:
         print("Error: File not found:", filename)
         sys.exit(1)
@@ -68,17 +73,17 @@ def detect_suspicious_activity(message_counts, threshold):
             suspicious_activity.append((message, count))
     return suspicious_activity
 
-def build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity):
+def build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity):
     lines = []
     lines.append(f"Source File: {filename}")
     lines.append("")
     lines.append("Log Summary")
     lines.append("-----------")
-    lines.append(f"ERROR: {error_count}")
-    lines.append(f"WARNING: {warning_count}")
-    lines.append(f"INFO: {info_count}")
-    lines.append(f"Malformed Lines Skipped: {malformed_count}")
-    lines.append(f"Unknown Levels Skipped: {unknown_count}")
+    lines.append(f"ERROR: {level_counts['ERROR']}")
+    lines.append(f"WARNING: {level_counts['WARNING']}")
+    lines.append(f"INFO: {level_counts['INFO']}")
+    lines.append(f"Malformed Lines Skipped: {skipped_counts['malformed']}")
+    lines.append(f"Unknown Levels Skipped: {skipped_counts['unknown_level']}")
     lines.append('')
     lines.append("Message Counts:")
     lines.append("---------------")
@@ -109,9 +114,9 @@ def export_summary(summary, export_filename):
 
 def main():
     filename, export_enabled, export_filename, threshold = get_options()
-    info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(filename)
+    level_counts, skipped_counts, message_counts = analyze_log(filename)
     suspicious_activity = detect_suspicious_activity(message_counts, threshold)
-    summary = build_summary(filename, info_count, warning_count, error_count, malformed_count, unknown_count, message_counts, suspicious_activity)
+    summary = build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity)
     print_summary(summary)
     if export_enabled: 
         export_summary(summary, export_filename)

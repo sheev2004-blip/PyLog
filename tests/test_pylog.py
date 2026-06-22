@@ -32,11 +32,15 @@ def test_detects_failed_logins_case_insensitive():
 def test_build_summary_includes_log_counts():
     summary = build_summary(
         filename = "sample.log",
-        info_count = 2,
-        warning_count = 1,
-        error_count = 3,
-        malformed_count = 0,
-        unknown_count = 1,
+        level_counts = {
+            "INFO": 2,
+            "WARNING": 1,
+            "ERROR": 3
+        },
+        skipped_counts = {
+            "malformed": 0,
+            "unknown_level": 1
+        },
         message_counts = {
             "Failed login": 3,
             "Login successful": 2,
@@ -55,11 +59,15 @@ def test_build_summary_includes_log_counts():
 def test_build_summary_includes_suspicious_activity():
     summary = build_summary(
         filename = "sample.log",
-        info_count = 1,
-        warning_count = 0,
-        error_count = 0,
-        malformed_count = 0,
-        unknown_count = 0,
+        level_counts = {
+            "INFO": 1,
+            "WARNING": 0,
+            "ERROR": 0
+        },
+        skipped_counts = {
+            "malformed": 0,
+            "unknown_level": 0
+        },
         message_counts = {"Login successful": 1},
         suspicious_activity = []
     )
@@ -70,11 +78,15 @@ def test_build_summary_includes_suspicious_activity():
 def test_build_summary_sorts_message_counts_by_frequency():
     summary = build_summary(
         filename="sample.log",
-        info_count=0,
-        warning_count=0,
-        error_count=0,
-        malformed_count=0,
-        unknown_count=0,
+        level_counts={
+            "INFO": 0,
+            "WARNING": 0,
+            "ERROR": 0
+        },
+        skipped_counts={
+            "malformed": 0,
+            "unknown_level": 0
+        },
         message_counts={
             "Low disk space": 1,
             "Failed login": 3,
@@ -99,12 +111,12 @@ def test_analyze_log_counts_valid_entries(tmp_path):
         "bad line\n"
         "2026-06-12 DEBUG Debug message\n"
     )
-    info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(log_file)
-    assert info_count == 1
-    assert warning_count == 1
-    assert error_count == 2
-    assert malformed_count == 1
-    assert unknown_count == 1
+    level_counts, skipped_counts, message_counts = analyze_log(log_file)
+    assert level_counts["INFO"] == 1
+    assert level_counts["WARNING"] == 1
+    assert level_counts["ERROR"] == 2
+    assert skipped_counts["malformed"] == 1
+    assert skipped_counts["unknown_level"] == 1
 
     assert message_counts["Login successful"] == 1
     assert message_counts["Failed login"] == 2
@@ -120,12 +132,12 @@ def test_analyze_log_handles_blank_lines(tmp_path):
         "\n"
         "2026-06-12 WARNING Low disk space\n"
     ) 
-    info_count, warning_count, error_count, malformed_count, unknown_count, message_counts = analyze_log(log_file)
-    
-    assert info_count == 1
-    assert warning_count == 1
-    assert error_count == 1
-    assert malformed_count == 0
-    assert unknown_count == 0
+    level_counts, skipped_counts, message_counts = analyze_log(log_file)
+
+    assert level_counts["INFO"] == 1
+    assert level_counts["WARNING"] == 1
+    assert level_counts["ERROR"] == 1
+    assert skipped_counts["malformed"] == 0
+    assert skipped_counts["unknown_level"] == 0
 
 
