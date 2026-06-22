@@ -76,6 +76,12 @@ Set a custom failed login threshold:
 python pylog.py sample.log --threshold 5
 ```
 
+Add details about malformed lines and unknown log levels as they are encountered:
+
+```bash
+python pylog.py sample.log --verbose
+```
+
 ## Example Output
 
 ```text
