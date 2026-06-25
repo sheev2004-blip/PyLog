@@ -111,17 +111,17 @@ def test_analyze_log_counts_valid_entries(tmp_path):
         "bad line\n"
         "2026-06-12 DEBUG Debug message\n"
     )
-    level_counts, skipped_counts, message_counts = analyze_log(log_file, verbose=False)
-    assert level_counts["INFO"] == 1
-    assert level_counts["WARNING"] == 1
-    assert level_counts["ERROR"] == 2
-    assert skipped_counts["malformed"] == 1
-    assert skipped_counts["unknown_level"] == 1
+    analysis_result = analyze_log(log_file, verbose=False)
+    assert analysis_result.level_counts["INFO"] == 1
+    assert analysis_result.level_counts["WARNING"] == 1
+    assert analysis_result.level_counts["ERROR"] == 2
+    assert analysis_result.skipped_counts["malformed"] == 1
+    assert analysis_result.skipped_counts["unknown_level"] == 1
 
-    assert message_counts["Login successful"] == 1
-    assert message_counts["Failed login"] == 2
-    assert message_counts["Low disk space"] == 1
-    assert "Debug message" not in message_counts
+    assert analysis_result.message_counts["Login successful"] == 1
+    assert analysis_result.message_counts["Failed login"] == 2
+    assert analysis_result.message_counts["Low disk space"] == 1
+    assert "Debug message" not in analysis_result.message_counts
 
 def test_analyze_log_handles_blank_lines(tmp_path):
     log_file = tmp_path / "fake.log"
@@ -132,12 +132,12 @@ def test_analyze_log_handles_blank_lines(tmp_path):
         "\n"
         "2026-06-12 WARNING Low disk space\n"
     ) 
-    level_counts, skipped_counts, message_counts = analyze_log(log_file, verbose=False)
+    analysis_result = analyze_log(log_file, verbose=False)
 
-    assert level_counts["INFO"] == 1
-    assert level_counts["WARNING"] == 1
-    assert level_counts["ERROR"] == 1
-    assert skipped_counts["malformed"] == 0
-    assert skipped_counts["unknown_level"] == 0
+    assert analysis_result.level_counts["INFO"] == 1
+    assert analysis_result.level_counts["WARNING"] == 1
+    assert analysis_result.level_counts["ERROR"] == 1
+    assert analysis_result.skipped_counts["malformed"] == 0
+    assert analysis_result.skipped_counts["unknown_level"] == 0
 
 
