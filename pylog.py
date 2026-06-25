@@ -14,6 +14,7 @@ DEFAULT_CSV_FILENAME = "data.csv"
 DEFAULT_THRESHOLD = 3
 FAILED_LOGIN_PHRASE = "failed login"
 VALID_LEVELS = {"INFO", "WARNING", "ERROR"}
+DEFAULT_LEVEL= "ALL"
 
 def get_options():
     parser =  argparse.ArgumentParser(
@@ -24,6 +25,7 @@ def get_options():
     parser.add_argument("--csv", nargs="?", const=DEFAULT_CSV_FILENAME, help="Export data to a CSV file")
     parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD, help="Number of failed login attempts needed to trigger an alert")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+    parser.add_argument("--level", default=DEFAULT_LEVEL, choices=["ALL", "INFO", "WARNING", "ERROR"], help="Filter logs by level")
 
     args = parser.parse_args()
 
@@ -35,10 +37,11 @@ def get_options():
         "export": args.export,
         "csv_export": args.csv,
         "threshold": args.threshold,
-        "verbose": args.verbose
+        "verbose": args.verbose,
+        "level": args.level
     }
 
-def analyze_log(filename, verbose):
+def analyze_log(filename, verbose, level_filter):
     level_counts = {
     "INFO": 0,
     "WARNING": 0,
@@ -71,6 +74,9 @@ def analyze_log(filename, verbose):
                     skipped_counts["unknown_level"] += 1
                     if verbose:
                         print("Skipping unknown log level:", level)
+                    continue
+
+                if level_filter != DEFAULT_LEVEL and level != level_filter:
                     continue
 
                 message = parts[2].strip()
@@ -148,7 +154,7 @@ def export_csv(message_counts, filename):
 
 def main():
     options = get_options()
-    analysis_result = analyze_log(options["logfile"], options["verbose"])
+    analysis_result = analyze_log(options["logfile"], options["verbose"], options["level"])
     suspicious_activity = detect_suspicious_activity(analysis_result.message_counts, options["threshold"])
     summary = build_summary(options["logfile"], analysis_result.level_counts, 
                             analysis_result.skipped_counts, analysis_result.message_counts,
@@ -164,4 +170,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
