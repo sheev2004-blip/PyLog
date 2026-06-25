@@ -8,6 +8,15 @@ class AnalysisResult:
     skipped_counts: dict
     message_counts: dict
 
+@dataclass
+class CLIOptions:
+    logfile: str
+    export: str | None
+    csv_export: str | None
+    threshold: int
+    verbose: bool
+    level: str
+    top: int | None
 
 DEFAULT_EXPORT_FILENAME = "summary.txt"
 DEFAULT_CSV_FILENAME = "data.csv"
@@ -22,24 +31,29 @@ def get_options():
     )
     parser.add_argument("logfile", help="Path to the log file to analyze")
     parser.add_argument("--export", nargs="?", const=DEFAULT_EXPORT_FILENAME, help="Export the summary to a file")
-    parser.add_argument("--csv", nargs="?", const=DEFAULT_CSV_FILENAME, help="Export data to a CSV file")
+    parser.add_argument("--csv_export", nargs="?", const=DEFAULT_CSV_FILENAME, help="Export data to a CSV file")
     parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD, help="Number of failed login attempts needed to trigger an alert")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--level", default=DEFAULT_LEVEL, choices=["ALL", "INFO", "WARNING", "ERROR"], help="Filter logs by level")
+    parser.add_argument("--top", default=None, type=int, help="Display top N messages by frequency")
 
     args = parser.parse_args()
 
     if args.threshold < 1:
         parser.error("Threshold must be at least 1.")
 
-    return {
-        "logfile": args.logfile,
-        "export": args.export,
-        "csv_export": args.csv,
-        "threshold": args.threshold,
-        "verbose": args.verbose,
-        "level": args.level
-    }
+    if args.top is not None and args.top < 1:
+        parser.error("Top N must be a positive integer (>= 1).")
+    return CLIOptions(
+        logfile = args.logfile,
+        export = args.export,
+        csv_export = args.csv_export,
+        threshold = args.threshold,
+        verbose = args.verbose,
+        level = args.level,
+        top = args.top
+
+    )
 
 def analyze_log(filename, verbose, level_filter):
     level_counts = {
@@ -108,7 +122,12 @@ def detect_suspicious_activity(message_counts, threshold):
             suspicious_activity.append((message, count))
     return suspicious_activity
 
-def build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity):
+def apply_top_n(sorted_messages, top):
+    if top is not None:
+        sorted_messages = sorted_messages[:top]
+    return sorted_messages
+
+def build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity, top):
     lines = []
     lines.append(f"Source File: {filename}")
     lines.append("")
@@ -124,6 +143,8 @@ def build_summary(filename, level_counts, skipped_counts, message_counts, suspic
     lines.append("---------------")
 
     sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
+
+    sorted_messages = apply_top_n(sorted_messages, top)
 
     for message, count in sorted_messages:
         lines.append(f"{message}: {count}")
@@ -144,8 +165,10 @@ def export_summary(summary, export_filename):
     with open(export_filename, "w") as file:
         file.write(summary)
 
-def export_csv(message_counts, filename):
+def export_csv(message_counts, filename, top):
     sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
+
+    sorted_messages = apply_top_n(sorted_messages, top)
 
     with open(filename, "w") as file:
         file.write("Message,Count\n")
@@ -154,19 +177,19 @@ def export_csv(message_counts, filename):
 
 def main():
     options = get_options()
-    analysis_result = analyze_log(options["logfile"], options["verbose"], options["level"])
-    suspicious_activity = detect_suspicious_activity(analysis_result.message_counts, options["threshold"])
-    summary = build_summary(options["logfile"], analysis_result.level_counts, 
+    analysis_result = analyze_log(options.logfile, options.verbose, options.level)
+    suspicious_activity = detect_suspicious_activity(analysis_result.message_counts, options.threshold)
+    summary = build_summary(options.logfile, analysis_result.level_counts, 
                             analysis_result.skipped_counts, analysis_result.message_counts,
-                            suspicious_activity)
+                            suspicious_activity, options.top)
     print(summary)
-    print(f"Failed login threshold used: {options['threshold']}")
-    if options["export"]: 
-        export_summary(summary, options["export"])
-        print(f"Summary exported to {options['export']}")
-    if options["csv_export"]:
-        export_csv(analysis_result.message_counts, options["csv_export"])
-        print(f"Data exported to {options['csv_export']}")
+    print(f"Failed login threshold used: {options.threshold}")
+    if options.export: 
+        export_summary(summary, options.export)
+        print(f"Summary exported to {options.export}")
+    if options.csv_export:
+        export_csv(analysis_result.message_counts, options.csv_export, options.top)
+        print(f"Data exported to {options.csv_export}")
 
 if __name__ == "__main__":
     main()

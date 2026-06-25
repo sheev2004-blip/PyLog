@@ -46,7 +46,8 @@ def test_build_summary_includes_log_counts():
             "Login successful": 2,
             "Low disk space": 1 
         },
-        suspicious_activity = [("Failed login", 3)]
+        suspicious_activity = [("Failed login", 3)],
+        top=None
     )
 
     assert "Source File: sample.log" in summary
@@ -69,7 +70,8 @@ def test_build_summary_includes_suspicious_activity():
             "unknown_level": 0
         },
         message_counts = {"Login successful": 1},
-        suspicious_activity = []
+        suspicious_activity = [],
+        top=None
     )
 
     assert "Suspicious Activity:" in summary 
@@ -92,7 +94,8 @@ def test_build_summary_sorts_message_counts_by_frequency():
             "Failed login": 3,
             "Login successful": 2
         },
-        suspicious_activity=[]
+        suspicious_activity=[],
+        top=None
     )
 
     failed_index = summary.index("Failed login: 3")
@@ -139,5 +142,3 @@ def test_analyze_log_handles_blank_lines(tmp_path):
     assert analysis_result.level_counts["ERROR"] == 1
     assert analysis_result.skipped_counts["malformed"] == 0
     assert analysis_result.skipped_counts["unknown_level"] == 0
-
-
