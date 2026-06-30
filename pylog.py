@@ -1,6 +1,7 @@
 import sys
 import argparse
 from dataclasses import dataclass
+from functools import partial
 
 @dataclass
 class AnalysisResult: 
@@ -18,12 +19,21 @@ class CLIOptions:
     level: str
     top: int | None
 
+@dataclass
+class Alert:
+    rule: str
+    severity: str
+    message: str
+
 DEFAULT_EXPORT_FILENAME = "summary.txt"
 DEFAULT_CSV_FILENAME = "data.csv"
 DEFAULT_THRESHOLD = 3
 FAILED_LOGIN_PHRASE = "failed login"
 VALID_LEVELS = {"INFO", "WARNING", "ERROR"}
 DEFAULT_LEVEL= "ALL"
+SEVERITY_LOW = "LOW"
+SEVERITY_MEDIUM = "MEDIUM"
+SEVERITY_HIGH = "HIGH"
 
 def get_options():
     parser =  argparse.ArgumentParser(
@@ -115,19 +125,71 @@ def analyze_log(filename, verbose, level_filter):
         print("Error: File not found:", filename)
         sys.exit(1)
 
-def detect_suspicious_activity(message_counts, threshold):
-    suspicious_activity = []
-    for message, count in message_counts.items():
+def failed_login_rule(analysis_result, threshold):
+    for message, count in analysis_result.message_counts.items():
         if FAILED_LOGIN_PHRASE in message.lower() and count >= threshold:
-            suspicious_activity.append((message, count))
-    return suspicious_activity
+            return Alert(
+                rule="failed_login",
+                severity=SEVERITY_HIGH,
+                message=f"{count} failed login attempts detected"
+            )
+    return None
+
+def error_volume_rule(analysis_result):
+    error = analysis_result.level_counts["ERROR"]
+    warning = analysis_result.level_counts["WARNING"]
+    info = analysis_result.level_counts["INFO"]
+
+    if error > warning + info:
+         return Alert(
+            rule="error_volume",
+            severity=SEVERITY_HIGH,
+            message="ERROR volume exceeds normal activity"
+        )
+
+    return None
+
+def message_repetition_rule(analysis_result):
+    messages = analysis_result.message_counts
+
+    if len(messages) <= 1:
+        return None
+
+    total = sum(messages.values())
+    max_message, max_count = max(messages.items(), key=lambda x: x[1])
+
+    if max_count > total / 2:
+       return Alert(
+            rule="message_repetition",
+            severity=SEVERITY_MEDIUM,
+            message=f"'{max_message}' dominates logs ({max_count}/{total})"
+        )
+
+
+    return None
+
+def run_rules(analysis_result, threshold):
+    alerts = []
+
+    rules = [
+        partial(failed_login_rule, threshold=threshold),
+        error_volume_rule,
+        message_repetition_rule
+    ]
+
+    for rule in rules:
+        result = rule(analysis_result)
+        if result:
+            alerts.append(result)
+
+    return alerts
 
 def apply_top_n(sorted_messages, top):
     if top is not None:
         sorted_messages = sorted_messages[:top]
     return sorted_messages
 
-def build_summary(filename, level_counts, skipped_counts, message_counts, suspicious_activity, top):
+def build_summary(filename, level_counts, skipped_counts, message_counts, alerts, top):
     lines = []
     lines.append(f"Source File: {filename}")
     lines.append("")
@@ -152,9 +214,9 @@ def build_summary(filename, level_counts, skipped_counts, message_counts, suspic
 
     lines.append("Suspicious Activity:")
     lines.append("--------------------")
-    if suspicious_activity:
-        for message, count in suspicious_activity:
-            lines.append(f"{message} occurred {count} times")
+    if alerts:
+       for alert in alerts:
+            lines.append(f"[{alert.severity}] {alert.rule}: {alert.message}")
     else:
         lines.append("None detected.")
 
@@ -178,10 +240,10 @@ def export_csv(message_counts, filename, top):
 def main():
     options = get_options()
     analysis_result = analyze_log(options.logfile, options.verbose, options.level)
-    suspicious_activity = detect_suspicious_activity(analysis_result.message_counts, options.threshold)
+    alerts = run_rules(analysis_result, options.threshold)
     summary = build_summary(options.logfile, analysis_result.level_counts, 
                             analysis_result.skipped_counts, analysis_result.message_counts,
-                            suspicious_activity, options.top)
+                            alerts, options.top)
     print(summary)
     print(f"Failed login threshold used: {options.threshold}")
     if options.export: 

@@ -1,33 +1,53 @@
-from pylog import detect_suspicious_activity, build_summary, analyze_log
+from pylog import run_rules, AnalysisResult, build_summary, analyze_log
 
-def test_detects_failed_logins_at_threshold():
-    message_counts = {
-        "Failed login": 3,
-        "Login successful": 1
-    }
+def test_failed_login_rule_triggers():
+    analysis = AnalysisResult(
+        level_counts={"INFO": 0, "WARNING": 0, "ERROR": 0},
+        skipped_counts={"malformed": 0, "unknown_level": 0},
+        message_counts={"failed login attempt": 5}
+    )
 
-    result = detect_suspicious_activity(message_counts, 3)
+    alerts = run_rules(analysis, threshold=3)
 
-    assert result == [("Failed login", 3)]
+    assert len(alerts) == 1
+    assert alerts[0].rule == "failed_login"
+    assert alerts[0].severity == "HIGH"
 
-def test_does_not_detect_failed_logins_below_threshold():
-    message_counts = {
-        "Failed login": 2,
-        "Login successful": 1
-    }
+def test_error_volume_rule():
+    analysis = AnalysisResult(
+        level_counts={"INFO": 1, "WARNING": 1, "ERROR": 10},
+        skipped_counts={"malformed": 0, "unknown_level": 0},
+        message_counts={"a": 1}
+    )
 
-    result = detect_suspicious_activity(message_counts, 3)
+    alerts = run_rules(analysis, threshold=3)
 
-    assert result == []
+    assert any(a.rule == "error_volume" for a in alerts)
 
-def test_detects_failed_logins_case_insensitive():
-    message_counts = {
-        "FAILED LOGIN": 4
-    }
+def test_message_repetition_rule():
+    analysis = AnalysisResult(
+        level_counts={"INFO": 0, "WARNING": 0, "ERROR": 0},
+        skipped_counts={"malformed": 0, "unknown_level": 0},
+        message_counts={
+            "spam": 10,
+            "normal": 1
+        }
+    )
 
-    result = detect_suspicious_activity(message_counts, 3)
+    alerts = run_rules(analysis, threshold=3)
 
-    assert result == [("FAILED LOGIN", 4)]
+    assert any(a.rule == "message_repetition" for a in alerts)
+
+def test_no_alerts():
+    analysis = AnalysisResult(
+        level_counts={"INFO": 10, "WARNING": 2, "ERROR": 1},
+        skipped_counts={"malformed": 0, "unknown_level": 0},
+        message_counts={"ok": 5}
+    )
+
+    alerts = run_rules(analysis, threshold=3)
+
+    assert alerts == []
 
 def test_build_summary_includes_log_counts():
     summary = build_summary(
@@ -46,7 +66,7 @@ def test_build_summary_includes_log_counts():
             "Login successful": 2,
             "Low disk space": 1 
         },
-        suspicious_activity = [("Failed login", 3)],
+        alerts = [],
         top=None
     )
 
@@ -57,7 +77,7 @@ def test_build_summary_includes_log_counts():
     assert "Malformed Lines Skipped: 0" in summary
     assert "Unknown Levels Skipped: 1" in summary
 
-def test_build_summary_includes_suspicious_activity():
+def test_build_summary_includes_alerts():
     summary = build_summary(
         filename = "sample.log",
         level_counts = {
@@ -70,7 +90,7 @@ def test_build_summary_includes_suspicious_activity():
             "unknown_level": 0
         },
         message_counts = {"Login successful": 1},
-        suspicious_activity = [],
+        alerts = [],
         top=None
     )
 
@@ -94,7 +114,7 @@ def test_build_summary_sorts_message_counts_by_frequency():
             "Failed login": 3,
             "Login successful": 2
         },
-        suspicious_activity=[],
+        alerts=[],
         top=None
     )
 
