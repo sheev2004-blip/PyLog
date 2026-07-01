@@ -1,19 +1,23 @@
 import sys
 import argparse
+import dataclasses
 from dataclasses import dataclass
 from functools import partial
+import json
 
 @dataclass
 class AnalysisResult: 
     level_counts: dict
     skipped_counts: dict
     message_counts: dict
+    top_messages: list
 
 @dataclass
 class CLIOptions:
     logfile: str
     export: str | None
     csv_export: str | None
+    json: str | None
     threshold: int
     verbose: bool
     level: str
@@ -25,8 +29,21 @@ class Alert:
     severity: str
     message: str
 
+@dataclass
+class RenderData:
+    filename: str
+    level_counts: dict
+    skipped_counts: dict
+    top_messages: list
+    alerts: list
+
+@dataclass
+class RuleContext:
+    threshold: int
+
 DEFAULT_EXPORT_FILENAME = "summary.txt"
 DEFAULT_CSV_FILENAME = "data.csv"
+DEFAULT_JSON_FILENAME = "data.json"
 DEFAULT_THRESHOLD = 3
 FAILED_LOGIN_PHRASE = "failed login"
 VALID_LEVELS = {"INFO", "WARNING", "ERROR"}
@@ -42,6 +59,7 @@ def get_options():
     parser.add_argument("logfile", help="Path to the log file to analyze")
     parser.add_argument("--export", nargs="?", const=DEFAULT_EXPORT_FILENAME, help="Export the summary to a file")
     parser.add_argument("--csv_export", nargs="?", const=DEFAULT_CSV_FILENAME, help="Export data to a CSV file")
+    parser.add_argument("--json", nargs="?", const=DEFAULT_JSON_FILENAME, help="Export alert data to JSON file" )
     parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD, help="Number of failed login attempts needed to trigger an alert")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--level", default=DEFAULT_LEVEL, choices=["ALL", "INFO", "WARNING", "ERROR"], help="Filter logs by level")
@@ -58,6 +76,7 @@ def get_options():
         logfile = args.logfile,
         export = args.export,
         csv_export = args.csv_export,
+        json = args.json,
         threshold = args.threshold,
         verbose = args.verbose,
         level = args.level,
@@ -65,7 +84,7 @@ def get_options():
 
     )
 
-def analyze_log(filename, verbose, level_filter):
+def analyze_log(filename, verbose, level_filter, top):
     level_counts = {
     "INFO": 0,
     "WARNING": 0,
@@ -115,25 +134,34 @@ def analyze_log(filename, verbose, level_filter):
                     level_counts["WARNING"] += 1
                 elif level == "INFO":
                     level_counts["INFO"] += 1 
-         
+
+            sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
+            
+            if top is not None:
+                sorted_messages = sorted_messages[:top]
+            
         return AnalysisResult(
             level_counts = level_counts, 
             skipped_counts = skipped_counts, 
-            message_counts =  message_counts
+            message_counts = message_counts,
+            top_messages=sorted_messages
         )
     except FileNotFoundError:
         print("Error: File not found:", filename)
         sys.exit(1)
 
-def failed_login_rule(analysis_result, threshold):
-    for message, count in analysis_result.message_counts.items():
-        if FAILED_LOGIN_PHRASE in message.lower() and count >= threshold:
-            return Alert(
-                rule="failed_login",
-                severity=SEVERITY_HIGH,
-                message=f"{count} failed login attempts detected"
-            )
-    return None
+def make_failed_login_rule(threshold):
+    def rule(analysis_result):
+        for message, count in analysis_result.message_counts.items():
+            if FAILED_LOGIN_PHRASE in message.lower() and count >= threshold:
+                return Alert(
+                    rule="failed_login",
+                    severity=SEVERITY_HIGH,
+                    message=f"{count} failed login attempts detected"
+                )
+        return None
+
+    return rule
 
 def error_volume_rule(analysis_result):
     error = analysis_result.level_counts["ERROR"]
@@ -172,7 +200,7 @@ def run_rules(analysis_result, threshold):
     alerts = []
 
     rules = [
-        partial(failed_login_rule, threshold=threshold),
+        make_failed_login_rule(threshold),
         error_volume_rule,
         message_repetition_rule
     ]
@@ -184,74 +212,85 @@ def run_rules(analysis_result, threshold):
 
     return alerts
 
-def apply_top_n(sorted_messages, top):
-    if top is not None:
-        sorted_messages = sorted_messages[:top]
-    return sorted_messages
+def build_render_data(filename, analysis_result, alerts):
+    return RenderData(
+        filename=filename,
+        level_counts=analysis_result.level_counts,
+        skipped_counts=analysis_result.skipped_counts,
+        top_messages=analysis_result.top_messages,
+        alerts=alerts
+    )
 
-def build_summary(filename, level_counts, skipped_counts, message_counts, alerts, top):
+
+def render_cli(render_data):
     lines = []
-    lines.append(f"Source File: {filename}")
+
+    lines.append(f"Source File: {render_data.filename}")
     lines.append("")
     lines.append("Log Summary")
     lines.append("-----------")
-    lines.append(f"ERROR: {level_counts['ERROR']}")
-    lines.append(f"WARNING: {level_counts['WARNING']}")
-    lines.append(f"INFO: {level_counts['INFO']}")
-    lines.append(f"Malformed Lines Skipped: {skipped_counts['malformed']}")
-    lines.append(f"Unknown Levels Skipped: {skipped_counts['unknown_level']}")
+    lines.append(f"ERROR: {render_data.level_counts['ERROR']}")
+    lines.append(f"WARNING: {render_data.level_counts['WARNING']}")
+    lines.append(f"INFO: {render_data.level_counts['INFO']}")
+    lines.append(f"Malformed Lines Skipped: {render_data.skipped_counts['malformed']}")
+    lines.append(f"Unknown Levels Skipped: {render_data.skipped_counts['unknown_level']}")
     lines.append('')
     lines.append("Message Counts:")
     lines.append("---------------")
 
-    sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
-
-    sorted_messages = apply_top_n(sorted_messages, top)
-
-    for message, count in sorted_messages:
+    for message, count in render_data.top_messages:
         lines.append(f"{message}: {count}")
     lines.append('')
 
+
     lines.append("Suspicious Activity:")
     lines.append("--------------------")
-    if alerts:
-       for alert in alerts:
+
+    if render_data.alerts:
+       for alert in render_data.alerts:
             lines.append(f"[{alert.severity}] {alert.rule}: {alert.message}")
     else:
         lines.append("None detected.")
 
-    summary = '\n'.join(lines)
-    return summary
+    cli_summary = '\n'.join(lines)
+    return cli_summary
+
 
 def export_summary(summary, export_filename):
     with open(export_filename, "w") as file:
         file.write(summary)
 
-def export_csv(message_counts, filename, top):
-    sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
-
-    sorted_messages = apply_top_n(sorted_messages, top)
+def export_csv(top_messages, filename):
 
     with open(filename, "w") as file:
         file.write("Message,Count\n")
-        for message, count in sorted_messages:
+        for message, count in top_messages:
             file.write(f"{message},{count}\n")
+
+def export_json(alerts, filename):
+    alerts_list = []
+    for alert in alerts:
+        alerts_list.append(dataclasses.asdict(alert))
+    with open(filename, "w") as file:
+        json.dump(alerts_list, file)
 
 def main():
     options = get_options()
-    analysis_result = analyze_log(options.logfile, options.verbose, options.level)
+    analysis_result = analyze_log(options.logfile, options.verbose, options.level, options.top)
     alerts = run_rules(analysis_result, options.threshold)
-    summary = build_summary(options.logfile, analysis_result.level_counts, 
-                            analysis_result.skipped_counts, analysis_result.message_counts,
-                            alerts, options.top)
+    render_data = build_render_data(options.logfile, analysis_result, alerts)
+    summary = render_cli(render_data)
     print(summary)
     print(f"Failed login threshold used: {options.threshold}")
     if options.export: 
         export_summary(summary, options.export)
         print(f"Summary exported to {options.export}")
     if options.csv_export:
-        export_csv(analysis_result.message_counts, options.csv_export, options.top)
+        export_csv(analysis_result.top_messages, options.csv_export)
         print(f"Data exported to {options.csv_export}")
+    if options.json:
+        export_json(alerts, options.json)
+        print(f"Alerts data exported to {options.json}")
 
 if __name__ == "__main__":
     main()
