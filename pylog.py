@@ -279,7 +279,7 @@ def render_cli(render_data, threshold, verbose):
         lines.append(f"{render_data.ingestion_stats.skipped["blank"]} blank lines")
         lines.append(f"{render_data.ingestion_stats.skipped["malformed"]} malformed lines")
         lines.append(f"{render_data.ingestion_stats.skipped["unknown_level"]} lines with unknown levels")
-        lines.append(f"{render_data.ingestion_stats.skipped["decode_error"]} lines with decode errors")
+        lines.append(f"{render_data.ingestion_stats.skipped["decode_errors"]} lines with decode errors")
 
     lines.append("====================================")
     lines.append(f"File: {render_data.filename}")
