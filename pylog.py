@@ -4,13 +4,24 @@ import dataclasses
 from dataclasses import dataclass
 import json
 
+
+@dataclass
+class IngestionStats:
+    total_lines: int
+    valid_lines: int
+    valid_ratio: int
+    skipped: dict
+
 @dataclass
 class AnalysisResult: 
     level_counts: dict
-    skipped_counts: dict
     message_counts: dict
     top_messages: list
-    total_lines: int
+
+@dataclass
+class LogAnalysis:
+    analysis: AnalysisResult
+    ingestion: IngestionStats
 
 @dataclass
 class CLIOptions:
@@ -33,10 +44,10 @@ class Alert:
 class RenderData:
     filename: str
     level_counts: dict
-    skipped_counts: dict
     top_messages: list
-    total_lines: int
     alerts: list
+    ingestion_stats: dict
+
 
 DEFAULT_EXPORT_FILENAME = "summary.txt"
 DEFAULT_CSV_FILENAME = "data.csv"
@@ -88,45 +99,57 @@ def analyze_log(filename, verbose, level_filter):
     "ERROR": 0
     }
 
-    skipped_counts = {
-    "malformed": 0,
-    "unknown_level": 0
-}
+
+    ingestion_stats = {
+        "total_lines": 0,
+        "valid_lines": 0,
+        "skipped": {
+            "blank": 0,
+            "malformed": 0,
+            "unknown_level": 0,
+            "decode_errors": 0
+        }
+    }
+
     message_counts = {}
-    total_lines = 0
+
     
     try:
-        with open(filename) as file:
+        with open(filename, encoding="utf-8", errors="replace") as file:
             for line in file:
-                line = line.strip()
+                ingestion_stats["total_lines"] += 1
+
                 if not line:
+                    ingestion_stats["skipped"]["blank"] += 1
                     continue
 
-                total_lines += 1
+                line = line.strip()
+
+                if "�" in line:
+                    ingestion_stats["skipped"]["decode_errors"] += 1
+
                 parts = line.split(maxsplit=2)
 
-                if len(parts) < 3:
-                    skipped_counts["malformed"] += 1
+                if len(parts) < 3 or not parts[1] or not parts[2]:
+                    ingestion_stats["skipped"]["malformed"] += 1
                     if verbose:
                         print("Skipping malformed line:", line)
                     continue
 
-                level = parts[1]
+                level = parts[1].strip().upper()
 
                 if level not in VALID_LEVELS:
-                    skipped_counts["unknown_level"] += 1
+                    ingestion_stats["skipped"]["unknown_level"] += 1
                     if verbose:
                         print("Skipping unknown log level:", level)
                     continue
-
-                if level_filter != DEFAULT_LEVEL and level != level_filter:
+                ingestion_stats["valid_lines"] += 1
+                if level_filter != DEFAULT_LEVEL and level != level_filter.upper():
                     continue
 
-                message = parts[2].strip()
-                if message not in message_counts:
-                    message_counts[message] = 1
-                else:
-                    message_counts[message] += 1
+                message = parts[2].strip() if parts[2] else ""
+
+                message_counts[message] = message_counts.get(message, 0) + 1
 
                 if level == "ERROR":
                     level_counts["ERROR"] += 1
@@ -134,23 +157,31 @@ def analyze_log(filename, verbose, level_filter):
                     level_counts["WARNING"] += 1
                 elif level == "INFO":
                     level_counts["INFO"] += 1 
-
+            valid_ratio = (
+                ingestion_stats["valid_lines"] / ingestion_stats["total_lines"]
+                if ingestion_stats["total_lines"] > 0
+                    else 0
+)
             sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
             
-        return AnalysisResult(
-            level_counts = level_counts, 
-            skipped_counts = skipped_counts, 
+        return LogAnalysis(
+            AnalysisResult(level_counts = level_counts, 
             message_counts = message_counts,
-            top_messages=sorted_messages,
-            total_lines=total_lines
+            top_messages=sorted_messages), 
+            IngestionStats(
+            total_lines=ingestion_stats["total_lines"],
+            valid_lines=ingestion_stats["valid_lines"],
+            valid_ratio = valid_ratio,
+            skipped=ingestion_stats["skipped"]
+            )
         )
     except FileNotFoundError:
         print("Error: File not found:", filename)
         sys.exit(1)
 
 def make_failed_login_rule(threshold):
-    def rule(analysis_result):
-        for message, count in analysis_result.message_counts.items():
+    def rule(analysis):
+        for message, count in analysis.message_counts.items():
             if FAILED_LOGIN_PHRASE in message.lower() and count >= threshold:
                 return Alert(
                     rule="failed_login",
@@ -161,10 +192,10 @@ def make_failed_login_rule(threshold):
 
     return rule
 
-def error_volume_rule(analysis_result):
-    error = analysis_result.level_counts["ERROR"]
-    warning = analysis_result.level_counts["WARNING"]
-    info = analysis_result.level_counts["INFO"]
+def error_volume_rule(analysis):
+    error = analysis.level_counts["ERROR"]
+    warning = analysis.level_counts["WARNING"]
+    info = analysis.level_counts["INFO"]
 
     if error > warning + info:
          return Alert(
@@ -175,8 +206,8 @@ def error_volume_rule(analysis_result):
 
     return None
 
-def message_repetition_rule(analysis_result):
-    messages = analysis_result.message_counts
+def message_repetition_rule(analysis):
+    messages = analysis.message_counts
 
     if len(messages) <= 1:
         return None
@@ -194,7 +225,7 @@ def message_repetition_rule(analysis_result):
 
     return None
 
-def run_rules(analysis_result, threshold):
+def run_rules(log_analysis, threshold):
     alerts = []
 
     rules = [
@@ -204,32 +235,51 @@ def run_rules(analysis_result, threshold):
     ]
 
     for rule in rules:
-        result = rule(analysis_result)
+        result = rule(log_analysis.analysis)
         if result:
             alerts.append(result)
 
     return alerts
 
-def build_render_data(filename, analysis_result, alerts, top):
-    top_messages = analysis_result.top_messages
+def build_render_data(filename, log_analysis, alerts, top):
+    top_messages = log_analysis.analysis.top_messages
     if top is not None:
         top_messages = top_messages[:top]
 
     return RenderData(
         filename=filename,
-        level_counts=analysis_result.level_counts,
-        skipped_counts=analysis_result.skipped_counts,
+        level_counts=log_analysis.analysis.level_counts,
+        ingestion_stats=log_analysis.ingestion,
         top_messages=top_messages,
-        total_lines=analysis_result.total_lines,
         alerts=alerts
     )
 
 
-def render_cli(render_data, threshold):
+def render_cli(render_data, threshold, verbose):
     lines = []
 
-    skipped_total = render_data.skipped_counts['malformed'] + render_data.skipped_counts['unknown_level']
-    lines.append(f"{render_data.total_lines} lines processed | {len(render_data.alerts)} alert(s) | threshold = {threshold} | {skipped_total} lines skipped (malformed + unknown)")
+    skipped_total = render_data.ingestion_stats.skipped['malformed'] + render_data.ingestion_stats.skipped['unknown_level']
+    lines.append(f"{render_data.ingestion_stats.total_lines} lines processed")
+    lines.append(f"{render_data.ingestion_stats.valid_lines} valid lines")
+    lines.append(f"{len(render_data.alerts)} alert(s) | threshold = {threshold}")
+    lines.append(f"{skipped_total} lines skipped")
+
+    ratio = render_data.ingestion_stats.valid_ratio
+
+    if ratio >= 0.9:
+        trust = "HIGH"
+    elif ratio >= 0.75:
+        trust = "MEDIUM"
+    else:
+        trust = "LOW"
+
+    lines.append(f"Data quality: {trust} ({ratio}% valid)")
+
+    if verbose:
+        lines.append(f"{render_data.ingestion_stats.skipped["blank"]} blank lines")
+        lines.append(f"{render_data.ingestion_stats.skipped["malformed"]} malformed lines")
+        lines.append(f"{render_data.ingestion_stats.skipped["unknown_level"]} lines with unknown levels")
+        lines.append(f"{render_data.ingestion_stats.skipped["decode_error"]} lines with decode errors")
 
     lines.append("====================================")
     lines.append(f"File: {render_data.filename}")
@@ -241,8 +291,8 @@ def render_cli(render_data, threshold):
     lines.append(f"{'ERROR':<17}{render_data.level_counts['ERROR']:>5}")
     lines.append(f"{'WARNING':<17}{render_data.level_counts['WARNING']:>5}")
     lines.append(f"{'INFO':<17}{render_data.level_counts['INFO']:>5}")
-    lines.append(f"{'Malformed Lines':<17}{render_data.skipped_counts['malformed']:>5}")
-    lines.append(f"{'Unknown Levels':<17}{render_data.skipped_counts['unknown_level']:>5}")
+    lines.append(f"{'Malformed Lines':<17}{render_data.ingestion_stats.skipped['malformed']:>5}")
+    lines.append(f"{'Unknown Levels':<17}{render_data.ingestion_stats.skipped['unknown_level']:>5}")
     lines.append('')
     lines.append("Message Frequency")
     lines.append("------------------------------------")
@@ -269,13 +319,13 @@ def render_cli(render_data, threshold):
 
 
 def export_summary(summary, export_filename):
-    with open(export_filename, "w") as file:
+    with open(export_filename, "w", encoding="utf-8", errors="replace") as file:
         file.write(summary)
 
 def export_csv(top_messages, filename, top):
     if top is not None:
         top_messages = top_messages[:top]
-    with open(filename, "w") as file:
+    with open(filename, "w", encoding="utf-8", errors="replace") as file:
         file.write("Message,Count\n")
         for message, count in top_messages:
             file.write(f"{message},{count}\n")
@@ -287,7 +337,7 @@ def export_json(alerts, filename):
         "alerts": [dataclasses.asdict(a) for a in alerts]
     }
 
-    with open(filename, "w") as file:
+    with open(filename, "w", encoding="utf-8", errors="replace") as file:
         json.dump(output, file, indent=2)
 
 def main():
@@ -295,7 +345,7 @@ def main():
     analysis_result = analyze_log(options.logfile, options.verbose, options.level)
     alerts = run_rules(analysis_result, options.threshold)
     render_data = build_render_data(options.logfile, analysis_result, alerts, options.top)
-    summary = render_cli(render_data, options.threshold)
+    summary = render_cli(render_data, options.threshold, options.verbose)
     print(summary)
 
     if options.export: 
