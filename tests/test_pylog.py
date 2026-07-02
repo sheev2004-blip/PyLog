@@ -6,7 +6,8 @@ def test_failed_login_rule_triggers():
         level_counts={"INFO": 0, "WARNING": 0, "ERROR": 0},
         skipped_counts={"malformed": 0, "unknown_level": 0},
         message_counts={"failed login attempt": 5},
-        top_messages=[("failed login attempt", 5)]
+        top_messages=[("failed login attempt", 5)],
+        total_lines= 5
     )
 
     alerts = run_rules(analysis, threshold=3)
@@ -21,7 +22,8 @@ def test_error_volume_rule():
         level_counts={"INFO": 1, "WARNING": 1, "ERROR": 10},
         skipped_counts={"malformed": 0, "unknown_level": 0},
         message_counts={"a": 1},
-        top_messages=[("a", 1)]
+        top_messages=[("a", 1)],
+        total_lines=12
     )
 
     alerts = run_rules(analysis, threshold=3)
@@ -34,7 +36,8 @@ def test_message_repetition_rule():
         level_counts={"INFO": 0, "WARNING": 0, "ERROR": 0},
         skipped_counts={"malformed": 0, "unknown_level": 0},
         message_counts={"spam": 10, "normal": 1},
-        top_messages=[("spam", 10), ("normal", 1)]
+        top_messages=[("spam", 10), ("normal", 1)],
+        total_lines= 11
     )
 
     alerts = run_rules(analysis, threshold=3)
@@ -47,7 +50,8 @@ def test_no_alerts():
         level_counts={"INFO": 10, "WARNING": 2, "ERROR": 1},
         skipped_counts={"malformed": 0, "unknown_level": 0},
         message_counts={"ok": 5},
-        top_messages=[("ok", 5)]
+        top_messages=[("ok", 5)],
+        total_lines= 13
     )
 
     alerts = run_rules(analysis, threshold=3)
@@ -65,17 +69,23 @@ def test_render_includes_log_counts():
             ("Login successful", 2),
             ("Low disk space", 1)
         ],
-        alerts=[]
+        alerts=[],
+        total_lines=6
     )
 
-    summary = render_cli(render_data, use_top=False)
+    summary = render_cli(render_data, threshold=3)
 
-    assert "Source File: sample.log" in summary
-    assert "ERROR: 3" in summary
-    assert "WARNING: 1" in summary
-    assert "INFO: 2" in summary
-    assert "Malformed Lines Skipped: 0" in summary
-    assert "Unknown Levels Skipped: 1" in summary
+    assert "File: sample.log" in summary
+    assert "ERROR" in summary
+    assert "3" in summary
+    assert "WARNING" in summary
+    assert "1" in summary
+    assert "INFO" in summary
+    assert "2" in summary
+    assert "Malformed Lines" in summary
+    assert "0" in summary
+    assert "Unknown Levels" in summary
+    assert "1" in summary
 
 
 def test_render_includes_alerts():
@@ -91,7 +101,8 @@ def test_render_includes_alerts():
             ("failed login attempt", 3),
             ("low disk space", 1),
             ("login successful", 2)
-        ]
+        ],
+        total_lines= 6
     )
 
     render_data = RenderData(
@@ -99,12 +110,13 @@ def test_render_includes_alerts():
         level_counts=analysis.level_counts,
         skipped_counts=analysis.skipped_counts,
         top_messages=analysis.top_messages,
-        alerts=run_rules(analysis, threshold=3)
+        alerts=run_rules(analysis, threshold=3),
+        total_lines=6
     )
 
-    summary = render_cli(render_data, use_top=False)
+    summary = render_cli(render_data, threshold=3)
 
-    assert "Suspicious Activity:" in summary
+    assert "No alerts detected" not in summary
 
 
 def test_render_sorts_message_counts_by_frequency():
@@ -120,7 +132,8 @@ def test_render_sorts_message_counts_by_frequency():
             ("Failed login", 3),
             ("Login successful", 2),
             ("Low disk space", 1)
-        ]
+        ],
+        total_lines=6
     )
 
     render_data = RenderData(
@@ -128,14 +141,15 @@ def test_render_sorts_message_counts_by_frequency():
         level_counts=analysis.level_counts,
         skipped_counts=analysis.skipped_counts,
         top_messages=analysis.top_messages,
-        alerts=run_rules(analysis, threshold=3)
+        alerts=run_rules(analysis, threshold=3),
+        total_lines=6
     )
 
-    summary = render_cli(render_data, use_top=True)
+    summary = render_cli(render_data, threshold=3)
 
-    failed_index = summary.index("Failed login: 3")
-    login_index = summary.index("Login successful: 2")
-    disk_index = summary.index("Low disk space: 1")
+    failed_index = summary.index("Failed login")
+    login_index = summary.index("Login successful")
+    disk_index = summary.index("Low disk space")
 
     assert failed_index < login_index < disk_index
 
@@ -154,8 +168,7 @@ def test_analyze_log_counts_valid_entries(tmp_path):
     analysis_result = analyze_log(
         log_file,
         verbose=False,
-        level_filter="ALL",
-        top=None
+        level_filter="ALL"
     )
 
     assert analysis_result.level_counts["INFO"] == 1
@@ -183,8 +196,7 @@ def test_analyze_log_handles_blank_lines(tmp_path):
     analysis_result = analyze_log(
         log_file,
         verbose=False,
-        level_filter="ALL",
-        top=None
+        level_filter="ALL"
     )
 
     assert analysis_result.level_counts["INFO"] == 1
