@@ -13,6 +13,10 @@ class IngestionStats:
     skipped: dict
 
 @dataclass
+class IngestionDiagnostics:
+    sample_errors: dict
+
+@dataclass
 class AnalysisResult: 
     level_counts: dict
     message_counts: dict
@@ -22,6 +26,7 @@ class AnalysisResult:
 class LogAnalysis:
     analysis: AnalysisResult
     ingestion: IngestionStats
+    diagnostics: IngestionDiagnostics
 
 @dataclass
 class CLIOptions:
@@ -47,6 +52,7 @@ class RenderData:
     top_messages: list
     alerts: list
     ingestion_stats: dict
+    ingestion_diagnostics: dict
 
 
 DEFAULT_EXPORT_FILENAME = "summary.txt"
@@ -59,6 +65,7 @@ DEFAULT_LEVEL= "ALL"
 SEVERITY_LOW = "LOW"
 SEVERITY_MEDIUM = "MEDIUM"
 SEVERITY_HIGH = "HIGH"
+MAX_SAMPLES = 3
 
 def get_options():
     parser =  argparse.ArgumentParser(
@@ -111,6 +118,12 @@ def analyze_log(filename, verbose, level_filter):
         }
     }
 
+    diagnostics = {
+    "malformed": [],
+    "unknown_level": [],
+    "decode_errors": []
+}
+
     message_counts = {}
 
     
@@ -127,21 +140,23 @@ def analyze_log(filename, verbose, level_filter):
 
                 if "�" in line:
                     ingestion_stats["skipped"]["decode_errors"] += 1
+                    if len(diagnostics["decode_errors"]) < MAX_SAMPLES:
+                        diagnostics["decode_errors"].append(line)
 
                 parts = line.split(maxsplit=2)
 
                 if len(parts) < 3 or not parts[1] or not parts[2]:
                     ingestion_stats["skipped"]["malformed"] += 1
-                    if verbose:
-                        print("Skipping malformed line:", line)
+                    if len(diagnostics["malformed"]) < MAX_SAMPLES:
+                        diagnostics["malformed"].append(line)
                     continue
 
                 level = parts[1].strip().upper()
 
                 if level not in VALID_LEVELS:
                     ingestion_stats["skipped"]["unknown_level"] += 1
-                    if verbose:
-                        print("Skipping unknown log level:", level)
+                    if len(diagnostics["unknown_level"]) < MAX_SAMPLES:
+                        diagnostics["unknown_level"].append(line)
                     continue
                 ingestion_stats["valid_lines"] += 1
                 if level_filter != DEFAULT_LEVEL and level != level_filter.upper():
@@ -173,6 +188,9 @@ def analyze_log(filename, verbose, level_filter):
             valid_lines=ingestion_stats["valid_lines"],
             valid_ratio = valid_ratio,
             skipped=ingestion_stats["skipped"]
+            ),
+            IngestionDiagnostics(
+            sample_errors=diagnostics
             )
         )
     except FileNotFoundError:
@@ -251,49 +269,41 @@ def build_render_data(filename, log_analysis, alerts, top):
         level_counts=log_analysis.analysis.level_counts,
         ingestion_stats=log_analysis.ingestion,
         top_messages=top_messages,
-        alerts=alerts
+        alerts=alerts,
+        ingestion_diagnostics=log_analysis.diagnostics
     )
 
 
 def render_cli(render_data, threshold, verbose):
     lines = []
 
-    skipped_total = render_data.ingestion_stats.skipped['malformed'] + render_data.ingestion_stats.skipped['unknown_level']
-    lines.append(f"{render_data.ingestion_stats.total_lines} lines processed")
-    lines.append(f"{render_data.ingestion_stats.valid_lines} valid lines")
-    lines.append(f"{len(render_data.alerts)} alert(s) | threshold = {threshold}")
-    lines.append(f"{skipped_total} lines skipped")
+    def format_ingestion_summary(ingestion_stats):
+        total = ingestion_stats.total_lines
+        valid = ingestion_stats.valid_lines
+        skipped = total - valid
 
-    ratio = render_data.ingestion_stats.valid_ratio
+        valid_ratio = ingestion_stats.valid_ratio
 
-    if ratio >= 0.9:
-        trust = "HIGH"
-    elif ratio >= 0.75:
-        trust = "MEDIUM"
-    else:
-        trust = "LOW"
-
-    lines.append(f"Data quality: {trust} ({ratio}% valid)")
-
-    if verbose:
-        lines.append(f"{render_data.ingestion_stats.skipped["blank"]} blank lines")
-        lines.append(f"{render_data.ingestion_stats.skipped["malformed"]} malformed lines")
-        lines.append(f"{render_data.ingestion_stats.skipped["unknown_level"]} lines with unknown levels")
-        lines.append(f"{render_data.ingestion_stats.skipped["decode_errors"]} lines with decode errors")
+        return (
+            f"Ingestion: {total} lines "
+            f"({valid_ratio:.0%} clean, {skipped} skipped)"
+        )
 
     lines.append("====================================")
     lines.append(f"File: {render_data.filename}")
     lines.append("====================================")
     lines.append("")
+    lines.append(f"{render_data.ingestion_stats.total_lines} lines processed")
+    lines.append(f"{render_data.ingestion_stats.valid_lines} valid lines")
+    lines.append(f"{len(render_data.alerts)} alert(s) | threshold = {threshold}")
+    
+    lines.append("")
     lines.append("Log Summary")
     lines.append("------------------------------------")
-
     lines.append(f"{'ERROR':<17}{render_data.level_counts['ERROR']:>5}")
     lines.append(f"{'WARNING':<17}{render_data.level_counts['WARNING']:>5}")
     lines.append(f"{'INFO':<17}{render_data.level_counts['INFO']:>5}")
-    lines.append(f"{'Malformed Lines':<17}{render_data.ingestion_stats.skipped['malformed']:>5}")
-    lines.append(f"{'Unknown Levels':<17}{render_data.ingestion_stats.skipped['unknown_level']:>5}")
-    lines.append('')
+    lines.append("")
     lines.append("Message Frequency")
     lines.append("------------------------------------")
 
@@ -303,7 +313,20 @@ def render_cli(render_data, threshold, verbose):
         lines.append(f"{message:<{width}} {count:>5}")
     lines.append('')
 
+    lines.append("")
+    lines.append(format_ingestion_summary(render_data.ingestion_stats))
 
+    if verbose:
+        lines.append("")
+        lines.append("Ingestion Details:")
+        lines.append("-------------------")
+
+        skipped = render_data.ingestion_stats.skipped
+
+        for key, value in skipped.items():
+            lines.append(f"- {key}: {value}")
+
+    lines.append("")
     lines.append("Alerts")
     lines.append("------------------------------------")
 
