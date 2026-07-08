@@ -55,16 +55,21 @@ It is built as a modular system with clear separation between ingestion, analysi
 
 PyLog is designed as a layered pipeline:
 
-```text
-Log File
-   ↓
-Ingestion (parsing + stats)
-   ↓
-Analysis (counts + trends)
-   ↓
-Rule Engine (alert detection)
-   ↓
-Rendering Layer (CLI output)
+```mermaid
+flowchart TD
+    A[Log File] --> B[Ingestion]
+    B --> C[Analysis]
+    C --> D[Rule Engine]
+    D --> E[Rendering Layer]
+
+    B --> B1[Parse lines]
+    B --> B2[Track ingestion stats]
+
+    C --> C1[Level counts]
+    C --> C2[Message frequency]
+
+    D --> D1[Threshold rules]
+    D --> D2[Severity scoring]
 ```
 
 ---
