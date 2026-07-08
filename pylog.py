@@ -15,6 +15,7 @@ class IngestionStats:
 @dataclass
 class IngestionDiagnostics:
     sample_errors: dict
+    ingestion_health: str
 
 @dataclass
 class AnalysisResult: 
@@ -51,8 +52,8 @@ class RenderData:
     level_counts: dict
     top_messages: list
     alerts: list
-    ingestion_stats: dict
-    ingestion_diagnostics: dict
+    ingestion: IngestionStats
+    diagnostics: IngestionDiagnostics
 
 
 DEFAULT_EXPORT_FILENAME = "summary.txt"
@@ -99,7 +100,7 @@ def get_options():
 
     )
 
-def analyze_log(filename, verbose, level_filter):
+def analyze_log(filename, level_filter): 
     level_counts = {
     "INFO": 0,
     "WARNING": 0,
@@ -132,11 +133,11 @@ def analyze_log(filename, verbose, level_filter):
             for line in file:
                 ingestion_stats["total_lines"] += 1
 
+                line = line.strip()
+
                 if not line:
                     ingestion_stats["skipped"]["blank"] += 1
                     continue
-
-                line = line.strip()
 
                 if "�" in line:
                     ingestion_stats["skipped"]["decode_errors"] += 1
@@ -176,7 +177,13 @@ def analyze_log(filename, verbose, level_filter):
                 ingestion_stats["valid_lines"] / ingestion_stats["total_lines"]
                 if ingestion_stats["total_lines"] > 0
                     else 0
-)
+            )
+            if valid_ratio >= 0.9:
+                health = "HIGH"
+            elif valid_ratio >= 0.8:
+                health = "MEDIUM"
+            else:
+                health = "LOW"
             sorted_messages = sorted(message_counts.items(), key=lambda item: item[1], reverse=True)
             
         return LogAnalysis(
@@ -190,7 +197,8 @@ def analyze_log(filename, verbose, level_filter):
             skipped=ingestion_stats["skipped"]
             ),
             IngestionDiagnostics(
-            sample_errors=diagnostics
+            sample_errors=diagnostics,
+            ingestion_health=health
             )
         )
     except FileNotFoundError:
@@ -253,7 +261,7 @@ def run_rules(log_analysis, threshold):
     ]
 
     for rule in rules:
-        result = rule(log_analysis.analysis)
+        result = rule(log_analysis)
         if result:
             alerts.append(result)
 
@@ -267,34 +275,100 @@ def build_render_data(filename, log_analysis, alerts, top):
     return RenderData(
         filename=filename,
         level_counts=log_analysis.analysis.level_counts,
-        ingestion_stats=log_analysis.ingestion,
+        ingestion=log_analysis.ingestion,
         top_messages=top_messages,
         alerts=alerts,
-        ingestion_diagnostics=log_analysis.diagnostics
+        diagnostics=log_analysis.diagnostics
     )
 
+def format_ingestion_summary_block(stats):
+    lines = ["Ingestion Summary", "------------------------------------",
+              f"Ingestion: {stats.total_lines} lines ({stats.valid_ratio:.0%} clean, {stats.total_lines - stats.valid_lines} skipped)"]
+    return lines
+
+def format_ingestion_verbose(diagnostics, stats):
+    lines = ["Ingestion Details:", "-------------------"]
+
+    skipped = stats.skipped
+    examples = diagnostics.sample_errors
+
+    for key, value in skipped.items():
+        lines.append(f"- {key}: {value}")
+
+    lines.append("")
+
+    lines.append("Malformed Examples:")
+
+    lines.append("")
+
+    if examples["malformed"]:
+        for malformed in examples["malformed"]:
+            lines.append(malformed)
+    else:
+        lines.append("None")
+
+    lines.append("")
+        
+    lines.append("Unknown Level Examples:")
+
+    lines.append("")
+
+    if examples["unknown_level"]:
+        for unknown in examples["unknown_level"]:
+            lines.append(unknown)
+    else:
+        lines.append("None")
+
+    lines.append("")
+
+    lines.append("Decode Error Examples:")
+
+    lines.append("")
+
+    if examples["decode_errors"]:
+        for decode in examples["decode_errors"]:
+            lines.append(decode)
+    else:
+        lines.append("None")
+
+    return lines
+
+
+def format_message_table(top_messages):
+    width = max(len(m) for m, _ in top_messages)
+
+    lines = ["Message Frequency", "------------------------------------"]
+
+    for message, count in top_messages:
+        lines.append(f"{message:<{width}} {count:>5}")
+
+    return lines
+
+def format_alerts(alerts):
+    lines = ["Alerts", "------------------------------------"]
+
+    if alerts:
+        for alert in alerts:
+            lines.append(f"{alert.severity} ALERT: {alert.rule}")
+            lines.append(alert.message)
+    else:
+        lines.append("No alerts detected")
+
+    return lines
 
 def render_cli(render_data, threshold, verbose):
     lines = []
 
-    def format_ingestion_summary(ingestion_stats):
-        total = ingestion_stats.total_lines
-        valid = ingestion_stats.valid_lines
-        skipped = total - valid
-
-        valid_ratio = ingestion_stats.valid_ratio
-
-        return (
-            f"Ingestion: {total} lines "
-            f"({valid_ratio:.0%} clean, {skipped} skipped)"
-        )
-
     lines.append("====================================")
-    lines.append(f"File: {render_data.filename}")
+    lines.append("PyLog Analysis Report")
+    lines.append("")
+    lines.append("Mode: default | verbose")
     lines.append("====================================")
     lines.append("")
-    lines.append(f"{render_data.ingestion_stats.total_lines} lines processed")
-    lines.append(f"{render_data.ingestion_stats.valid_lines} valid lines")
+    lines.append(f"File: {render_data.filename}")
+    lines.append("")
+    lines.append(f"{render_data.ingestion.total_lines} lines processed")
+    lines.append(f"{render_data.ingestion.valid_lines} valid lines")
     lines.append(f"{len(render_data.alerts)} alert(s) | threshold = {threshold}")
     
     lines.append("")
@@ -304,38 +378,20 @@ def render_cli(render_data, threshold, verbose):
     lines.append(f"{'WARNING':<17}{render_data.level_counts['WARNING']:>5}")
     lines.append(f"{'INFO':<17}{render_data.level_counts['INFO']:>5}")
     lines.append("")
-    lines.append("Message Frequency")
-    lines.append("------------------------------------")
-
-    width = max(len(m) for m, _ in render_data.top_messages)
-
-    for message, count in render_data.top_messages:
-        lines.append(f"{message:<{width}} {count:>5}")
-    lines.append('')
-
+    lines.extend(format_message_table(render_data.top_messages))
     lines.append("")
-    lines.append(format_ingestion_summary(render_data.ingestion_stats))
+    lines.extend(format_alerts(render_data.alerts))
+    lines.append("")
+    lines.extend(format_ingestion_summary_block(render_data.ingestion))
+    lines.append("")
 
     if verbose:
-        lines.append("")
-        lines.append("Ingestion Details:")
-        lines.append("-------------------")
-
-        skipped = render_data.ingestion_stats.skipped
-
-        for key, value in skipped.items():
-            lines.append(f"- {key}: {value}")
-
-    lines.append("")
-    lines.append("Alerts")
-    lines.append("------------------------------------")
-
-    if render_data.alerts:
-       for alert in render_data.alerts:
-            lines.append(f"{alert.severity} ALERT: {alert.rule}")
-            lines.append(f"{alert.message}")
-    else:
-        lines.append("No alerts detected")
+        lines.extend(
+            format_ingestion_verbose(
+                render_data.diagnostics,
+                render_data.ingestion
+            )
+        )
 
     cli_summary = '\n'.join(lines)
     return cli_summary
@@ -365,7 +421,7 @@ def export_json(alerts, filename):
 
 def main():
     options = get_options()
-    analysis_result = analyze_log(options.logfile, options.verbose, options.level)
+    analysis_result = analyze_log(options.logfile, options.level)
     alerts = run_rules(analysis_result, options.threshold)
     render_data = build_render_data(options.logfile, analysis_result, alerts, options.top)
     summary = render_cli(render_data, options.threshold, options.verbose)
