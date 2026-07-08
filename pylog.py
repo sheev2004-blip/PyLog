@@ -251,7 +251,7 @@ def message_repetition_rule(analysis):
 
     return None
 
-def run_rules(log_analysis, threshold):
+def run_rules(analysis, threshold):
     alerts = []
 
     rules = [
@@ -261,7 +261,7 @@ def run_rules(log_analysis, threshold):
     ]
 
     for rule in rules:
-        result = rule(log_analysis)
+        result = rule(analysis)
         if result:
             alerts.append(result)
 
@@ -335,6 +335,8 @@ def format_ingestion_verbose(diagnostics, stats):
 
 
 def format_message_table(top_messages):
+    if not top_messages:
+        return ["No messages found"]
     width = max(len(m) for m, _ in top_messages)
 
     lines = ["Message Frequency", "------------------------------------"]
@@ -422,7 +424,7 @@ def export_json(alerts, filename):
 def main():
     options = get_options()
     analysis_result = analyze_log(options.logfile, options.level)
-    alerts = run_rules(analysis_result, options.threshold)
+    alerts = run_rules(analysis_result.analysis, options.threshold)
     render_data = build_render_data(options.logfile, analysis_result, alerts, options.top)
     summary = render_cli(render_data, options.threshold, options.verbose)
     print(summary)

@@ -120,6 +120,30 @@ def test_edge_case_only_malformed(tmp_path):
     assert result.ingestion.valid_lines == 0
     assert result.ingestion.skipped["malformed"] == 2
 
+def test_empty_pipeline_renders_gracefully(tmp_path):
+    log_file = tmp_path / "empty.log"
+    log_file.write_text("")  # truly empty file
+
+    result = analyze_log(log_file, level_filter="ALL")
+
+    render_data = RenderData(
+        filename=log_file.name,
+        level_counts=result.analysis.level_counts,
+        top_messages=result.analysis.top_messages,
+        ingestion=result.ingestion,
+        diagnostics=result.diagnostics,
+        alerts=[]
+    )
+
+    summary = render_cli(render_data, threshold=3, verbose=False)
+    lines = summary.splitlines()
+
+    assert any("No messages found" in line for line in lines)
+    assert "File:" in summary
+    assert "ERROR" in summary
+    assert "WARNING" in summary
+    assert "INFO" in summary
+
 # =========================
 # RENDERING TESTS
 # =========================
@@ -258,7 +282,7 @@ def test_level_filter(tmp_path):
     result_error = analyze_log(log_file, level_filter="ERROR")
 
     assert result_error.analysis.level_counts == {"INFO": 0, "WARNING": 0, "ERROR": 2}
- 
+
 # =========================
 # INTEGRATION TESTS
 # =========================

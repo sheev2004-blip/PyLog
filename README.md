@@ -1,166 +1,209 @@
-# PyLog
+# PyLog — Log Analysis Tool
 
-PyLog is a Python command-line log analysis tool that reads a log file, summarizes log levels, reports repeated messages, detects simple suspicious activity patterns, and optionally exports the results to a text report.
+PyLog is a lightweight Python-based log analysis tool designed to parse structured log files, classify log levels, detect anomalies, and generate readable CLI summaries with rule-based alerting.
 
-## Overview
+It is built as a modular system with clear separation between ingestion, analysis, rule evaluation, and rendering.
 
-PyLog was built as a personal Python project to practice file processing, command-line arguments, dictionaries, error handling, Git/GitHub workflow, and basic cybersecurity-oriented log analysis.
+---
 
-The program currently supports logs formatted as:
+# Key Features
 
-```text
-DATE LEVEL MESSAGE
-```
+## Log Ingestion
+- Parses structured log files line by line
+- Detects:
+  - malformed lines
+  - blank lines
+  - unknown log levels
+- Tracks ingestion statistics
 
-Example:
+---
 
-```text
+## Log Analysis
+- Counts log levels:
+  - INFO
+  - WARNING
+  - ERROR
+- Extracts most frequent messages
+- Maintains structured analysis output
+
+---
+
+## Rule-Based Alert System
+- Detects patterns such as:
+  - failed login spikes
+  - error volume thresholds
+  - repeated messages
+- Generates severity-based alerts:
+  - HIGH
+  - MEDIUM
+  - LOW
+
+---
+
+## CLI Rendering
+- Human-readable CLI output
+- Structured sections:
+  - File header
+  - Log level summary
+  - Top messages
+  - Alert blocks
+- Supports verbose and compact modes
+
+---
+
+# Architecture Overview
+
+PyLog is designed as a layered pipeline:
+
++------------------+
+| Log File         |
++------------------+
+↓
++------------------+
+| Ingestion        |
+| (parsing + stats)|
++------------------+
+↓
++------------------+
+| Analysis         |
+| (counts + trends)|
++------------------+
+↓
++------------------+
+| Rule Engine      |
+| (alert detection)|
++------------------+
+↓
++------------------+
+| Rendering Layer  |
+| (CLI output)     |
++------------------+
+
+
+---
+
+# Testing Strategy
+
+The project includes a comprehensive pytest suite organized into:
+
+## Rule Engine Tests
+- Validates alert triggering logic
+
+## Ingestion Tests
+- Validates parsing correctness
+- Ensures blank/malformed detection
+- Verifies ingestion invariants
+
+## Analysis Tests
+- Validates log level counting
+- Message frequency tracking
+
+## Edge Case Tests
+- Handles malformed-only logs
+- Ensures system stability under noisy input
+
+## Rendering Tests
+- Validates CLI output structure
+- Ensures correct formatting of:
+  - headers
+  - log summaries
+  - alert blocks
+
+## Integration Test
+- End-to-end pipeline validation:
+  - ingestion → analysis → rules → rendering
+
+---
+
+# Example Input
+
 2026-06-12 INFO Login successful
 2026-06-12 ERROR Failed login
 2026-06-12 WARNING Low disk space
-```
 
-## Features
+---
 
-* Reads a log file from the command line
-* Counts `INFO`, `WARNING`, and `ERROR` entries
-* Skips blank lines
-* Skips malformed log lines
-* Skips unknown log levels
-* Handles missing files with a clear error message
-* Counts repeated log messages
-* Sorts message counts from most common to least common
-* Detects repeated failed login messages
-* Optionally exports the summary to a text file
-* Uses argparse for command-line options
-* Allows configurable failed-login threshold
+# Example Output
 
-## Technologies Used
+====================================
+PyLog Analysis Report
 
-* Python
-* Git
-* GitHub
-* Command-line interface
+Mode: default | verbose
+====================================
 
-## Usage
+File: input.log
 
-Run PyLog with a log file:
-
-```bash
-python pylog.py sample.log
-```
-
-This prints a summary to the terminal.
-
-Export to the default report file:
-
-```bash
-python pylog.py sample.log --export
-```
-
-This creates or updates:
-
-```text
-summary.txt
-```
-
-Export to a custom report file:
-
-```bash
-python pylog.py sample.log --export report.txt
-```
-
-Set a custom failed login threshold:
-
-```bash
-python pylog.py sample.log --threshold 5
-```
-
-Add details about malformed lines and unknown log levels as they are encountered:
-
-```bash
-python pylog.py sample.log --verbose
-```
-
-## Example Output
-
-```text
-Source File: sample.log
+3 lines processed
+3 valid lines
+0 alert(s) | threshold = 3
 
 Log Summary
------------
-ERROR: 3
-WARNING: 1
-INFO: 2
-Malformed Lines Skipped: 0
-Unknown Levels Skipped: 0
+------------------------------------
+ERROR                1
+WARNING              1
+INFO                 1
 
-Message Counts:
----------------
-Failed login: 3
-Login successful: 1
-Low disk space: 1
+Message Frequency
+------------------------------------
+Login successful     1
+Failed login         1
+Low disk space       1
 
-Suspicious Activity:
---------------------
-Failed login occurred 3 times
-```
+Alerts
+------------------------------------
+No alerts detected
 
-## Suspicious Activity Detection
+Ingestion Summary
+------------------------------------
+Ingestion: 3 lines (100% clean, 0 skipped)
 
-PyLog currently flags repeated failed login messages when they occur at least three times, or however many times indicated by the user's custom threshold.
+---
 
-Current detection rule:
+# Design Decisions
 
-```text
-Message contains "failed login" and count >= 3 (or custom number)
-```
+## Separation of Concerns
+Each layer has a single responsibility:
+- ingestion → parsing
+- analysis → aggregation
+- rules → detection
+- rendering → formatting
 
-This is a simple rule-based detection feature intended to demonstrate basic log analysis and security monitoring concepts.
+---
 
-## Testing
+## Deterministic Output
+All outputs are:
+- testable
+- reproducible
+- structured
 
-PyLog includes automated tests using `pytest`.
+---
 
-Run the test suite from the project root:
+## Test-Driven Development
+Core functionality is fully validated using pytest before release.
 
-```bash
-python -m pytest
+---
 
-## Project Structure
+# Future Improvements
 
-```text
-pylog/
-├── pylog.py
-├── sample.log
-├── README.md
-└── .gitignore
-```
+- config file support (thresholds, filters)
+- JSON log ingestion support
+- streaming log processing for large files
+- CLI argument interface (argparse)
+- richer alert rule system
 
-## Concepts Demonstrated
+---
 
-* File input and output
-* Command-line argument handling
-* Error handling with `try` / `except`
-* String parsing and validation
-* Dictionaries for frequency counting
-* Sorting data
-* Basic suspicious activity detection
-* Function-based program organization
-* Git/GitHub project workflow
+# What this project demonstrates
 
-## Current Limitations
+- modular system design
+- test-driven development
+- data pipeline architecture
+- CLI tool design
+- production-style test structuring
 
-* Expects logs to follow the `DATE LEVEL MESSAGE` format
-* Supports only `INFO`, `WARNING`, and `ERROR` log levels
-* Suspicious activity detection is currently rule-based and limited to repeated failed login messages
-* Does not currently support real Linux authentication log formats or multiple log formats
+---
 
-## Future Improvements
+# Status
 
-* Add support for additional log levels such as `DEBUG` and `CRITICAL`
-* Add more suspicious activity rules
-* Support additional log formats
-* Add CSV export
-
+v1.0 — Stable core release
 
