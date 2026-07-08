@@ -55,30 +55,17 @@ It is built as a modular system with clear separation between ingestion, analysi
 
 PyLog is designed as a layered pipeline:
 
-+------------------+
-| Log File         |
-+------------------+
-↓
-+------------------+
-| Ingestion        |
-| (parsing + stats)|
-+------------------+
-↓
-+------------------+
-| Analysis         |
-| (counts + trends)|
-+------------------+
-↓
-+------------------+
-| Rule Engine      |
-| (alert detection)|
-+------------------+
-↓
-+------------------+
-| Rendering Layer  |
-| (CLI output)     |
-+------------------+
-
+```text
+Log File
+   ↓
+Ingestion (parsing + stats)
+   ↓
+Analysis (counts + trends)
+   ↓
+Rule Engine (alert detection)
+   ↓
+Rendering Layer (CLI output)
+```
 
 ---
 
@@ -116,15 +103,15 @@ The project includes a comprehensive pytest suite organized into:
 ---
 
 # Example Input
-
+```text
 2026-06-12 INFO Login successful
 2026-06-12 ERROR Failed login
 2026-06-12 WARNING Low disk space
-
+```
 ---
 
 # Example Output
-
+```text
 ====================================
 PyLog Analysis Report
 
@@ -156,7 +143,7 @@ No alerts detected
 Ingestion Summary
 ------------------------------------
 Ingestion: 3 lines (100% clean, 0 skipped)
-
+```
 ---
 
 # Design Decisions
