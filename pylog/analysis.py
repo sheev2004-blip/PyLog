@@ -37,14 +37,8 @@ def analyze_log(filename, level_filter):
     try:
         with open(filename, encoding="utf-8", errors="replace") as file:
             for line in file:
-                parts = line.split(maxsplit=2)
-
-                level = parts[1].strip().upper()
-                if level_filter != DEFAULT_LEVEL and level != level_filter.upper():
-                    continue
-                
                 ingestion_stats["total_lines"] += 1
-
+                
                 line = line.strip()
 
                 if not line:
@@ -56,11 +50,17 @@ def analyze_log(filename, level_filter):
                     if len(diagnostics["decode_errors"]) < MAX_SAMPLES:
                         diagnostics["decode_errors"].append(line)
 
+                parts = line.split(maxsplit=2)
 
                 if len(parts) < 3 or not parts[1] or not parts[2]:
                     ingestion_stats["skipped"]["malformed"] += 1
                     if len(diagnostics["malformed"]) < MAX_SAMPLES:
                         diagnostics["malformed"].append(line)
+                    continue
+
+                level = parts[1].strip().upper()
+
+                if level_filter != DEFAULT_LEVEL and level != level_filter.upper():
                     continue
 
                 if level not in VALID_LEVELS:
