@@ -1,5 +1,13 @@
 # PyLog — Log Analysis Tool
 
+---
+
+## TL;DR
+
+PyLog is a Python CLI tool that analyzes log files using a structured pipeline (ingestion → analysis → rules → rendering) with full pytest coverage and deterministic output.
+
+---
+
 PyLog is a lightweight Python-based log analysis tool designed to parse structured log files, classify log levels, detect anomalies, and generate readable CLI summaries with rule-based alerting.
 
 It is built as a modular system with clear separation between ingestion, analysis, rule evaluation, and rendering.
@@ -174,13 +182,13 @@ Ingestion: 3 lines (100% clean, 0 skipped)
 
 ## Testing
 
+All core functionality is validated through pytest, including ingestion edge cases, rule evaluation, and full pipeline integration.
+
 Run the full test suite: 
 
 ```bash
 pytest
 ```
-
-All tests cover ingestion, analysis, rule evaluation, rendering, and full pipeline integration.
 
 ---
 
