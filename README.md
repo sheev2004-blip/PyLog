@@ -248,6 +248,6 @@ This project was built to simulate a production-style log processing pipeline wi
 
 # Status
 
-- v1.0 - Stable core release
-- v1.1 - (current version) Modular package structure 
-
+**Current Version:** v1.1.1  
+**State:** Stable  
+**Last Update:** Ingestion robustness improvements (blank + malformed line handling)
