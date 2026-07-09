@@ -16,7 +16,6 @@ It is built as a modular system with clear separation between ingestion, analysi
   - unknown log levels
 - Tracks ingestion statistics
 
----
 
 ## Log Analysis
 - Counts log levels:
@@ -26,7 +25,6 @@ It is built as a modular system with clear separation between ingestion, analysi
 - Extracts most frequent messages
 - Maintains structured analysis output
 
----
 
 ## Rule-Based Alert System
 - Detects patterns such as:
@@ -38,7 +36,6 @@ It is built as a modular system with clear separation between ingestion, analysi
   - MEDIUM
   - LOW
 
----
 
 ## CLI Rendering
 - Human-readable CLI output
@@ -49,11 +46,24 @@ It is built as a modular system with clear separation between ingestion, analysi
   - Alert blocks
 - Supports verbose and compact modes
 
+## CLI Flags
+
+### Required behavior
+- --threshold
+- --level
+- --top
+
+### Output controls
+- --verbose
+- --export
+- --csv_export
+- --json
+
 ---
 
 # Architecture Overview
 
-PyLog is designed as a layered pipeline:
+The system processes logs through a strict linear pipeline:
 
 ```mermaid
 flowchart TD
@@ -107,15 +117,24 @@ The project includes a comprehensive pytest suite organized into:
 
 ---
 
-# Example Input
+# Usage
+
+```bash
+python pylog.py sample.log
+```
+
+## Example Input
 ```text
 2026-06-12 INFO Login successful
 2026-06-12 ERROR Failed login
 2026-06-12 WARNING Low disk space
 ```
----
 
-# Example Output
+## Full CLI Output
+
+<details>
+<summary>Expand full output</summary>
+
 ```text
 ====================================
 PyLog Analysis Report
@@ -149,6 +168,20 @@ Ingestion Summary
 ------------------------------------
 Ingestion: 3 lines (100% clean, 0 skipped)
 ```
+
+</details>
+
+
+## Testing
+
+Run the full test suite: 
+
+```bash
+pytest
+```
+
+All tests cover ingestion, analysis, rule evaluation, rendering, and full pipeline integration.
+
 ---
 
 # Design Decisions
@@ -160,7 +193,6 @@ Each layer has a single responsibility:
 - rules → detection
 - rendering → formatting
 
----
 
 ## Deterministic Output
 All outputs are:
@@ -168,10 +200,16 @@ All outputs are:
 - reproducible
 - structured
 
----
 
 ## Test-Driven Development
 Core functionality is fully validated using pytest before release.
+
+
+## Design Tradeoffs
+
+- Chose a layered architecture to enforce separation of concerns over a monolithic parser design.
+- Prioritized deterministic outputs to enable reliable testing.
+- Opted for structured CLI output over flexible formatting for simplicity and stability.
 
 ---
 
@@ -187,13 +225,18 @@ Core functionality is fully validated using pytest before release.
 
 # What this project demonstrates
 
-- modular system design
-- test-driven development
-- data pipeline architecture
-- CLI tool design
-- production-style test structuring
+- Building a modular, test-driven data processing pipeline
+- Designing CLI tools with predictable structured output
+- Writing robust tests for ingestion, logic, and rendering layers
 
 ---
+
+# Motivation
+
+This project was built to simulate a production-style log processing pipeline with strict separation between ingestion, analysis, rule evaluation, and rendering. The goal was to focus on correctness, testability, and predictable CLI behavior rather than relying on external logging frameworks.
+
+---
+
 
 # Status
 
