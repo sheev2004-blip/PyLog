@@ -1,144 +1,140 @@
 # PyLog — Log Analysis Tool
 
----
-
-## TL;DR
-
-PyLog is a Python CLI tool that analyzes log files using a structured pipeline (ingestion → analysis → rules → rendering) with full pytest coverage and deterministic output.
+Lightweight Python CLI tool for parsing structured logs, detecting anomalies, and generating rule-based reports using a modular pipeline architecture.
 
 ---
 
-PyLog is a lightweight Python-based log analysis tool designed to parse structured log files, classify log levels, detect anomalies, and generate readable CLI summaries with rule-based alerting.
+# TL;DR
 
-It is built as a modular system with clear separation between ingestion, analysis, rule evaluation, and rendering.
+PyLog is a fully tested Python log analysis pipeline featuring:
 
----
-
-# Key Features
-
-## Log Ingestion
-- Parses structured log files line by line
-- Detects:
-  - malformed lines
-  - blank lines
-  - unknown log levels
-- Tracks ingestion statistics
-
-
-## Log Analysis
-- Counts log levels:
-  - INFO
-  - WARNING
-  - ERROR
-- Extracts most frequent messages
-- Maintains structured analysis output
-
-
-## Rule-Based Alert System
-- Detects patterns such as:
-  - failed login spikes
-  - error volume thresholds
-  - repeated messages
-- Generates severity-based alerts:
-  - HIGH
-  - MEDIUM
-  - LOW
-
-
-## CLI Rendering
-- Human-readable CLI output
-- Structured sections:
-  - File header
-  - Log level summary
-  - Top messages
-  - Alert blocks
-- Supports verbose and compact modes
-
-## CLI Flags
-
-### Required behavior
-- --threshold
-- --level
-- --top
-
-### Output controls
-- --verbose
-- --export
-- --csv_export
-- --json
+- ingestion and validation
+- structured analysis of log levels and message frequency
+- rule-based alerting system
+- CLI rendering with export support
+- modular architecture with pytest coverage
 
 ---
 
-# Architecture Overview
+# Why this project matters
 
-The system processes logs through a strict linear pipeline:
+This project demonstrates:
+
+- layered system design (ingestion → analysis → rules → rendering)
+- real-world error handling (blank and malformed input handling)
+- test-driven development with full pytest coverage
+- CLI tool design with structured and deterministic output
+- separation of concerns in a modular Python package
+
+---
+
+# Architecture
 
 ```mermaid
 flowchart TD
     A[Log File] --> B[Ingestion]
     B --> C[Analysis]
     C --> D[Rule Engine]
-    D --> E[Rendering Layer]
+    D --> E[CLI Rendering]
 
-    B --> B1[Parse lines]
-    B --> B2[Track ingestion stats]
+    B --> B1[Blank line handling]
+    B --> B2[Malformed detection]
 
     C --> C1[Level counts]
     C --> C2[Message frequency]
 
     D --> D1[Threshold rules]
-    D --> D2[Severity scoring]
+    D --> D2[Severity alerts]
+
 ```
+
+---
+
+# Features
+## Ingestion Layer
+
+Parses structured log files and ensures robust handling of invalid input.
+
+- Reads log files line by line
+- Handles blank lines safely
+- Detects malformed lines
+- Detects unknown log levels
+- Tracks ingestion statistics including:
+    - total lines
+    - valid lines
+    - skipped categories
+
+## Analysis Layer
+
+Processes valid log entries into structured statistics.
+
+- Counts log levels:
+    - INFO
+    - WARNING
+    - ERROR
+- Extracts and aggregates message frequency
+- Produces deterministic analysis output
+
+## Rule Engine
+
+Evaluates log data against configurable thresholds.
+
+- Detects failed login spikes
+- Detects repeated error patterns
+- Applies threshold-based rules
+- Generates severity-based alerts:
+    - HIGH
+    - MEDIUM
+    - LOW
+
+## CLI Output Layer
+
+Generates structured terminal output.
+
+- Human-readable report formatting
+- Displays:
+    - file metadata
+    - ingestion summary
+    - log level breakdown
+    - top messages
+    - alerts
+- Supports:
+    - verbose mode
+    - compact mode
+    - export flags
 
 ---
 
 # Testing Strategy
 
-The project includes a comprehensive pytest suite organized into:
+PyLog includes a full pytest suite covering:
 
-## Rule Engine Tests
-- Validates alert triggering logic
+- ingestion correctness (including edge cases)
+- analysis validation
+- rule engine behavior
+- rendering structure validation
+- full pipeline integration test
 
-## Ingestion Tests
-- Validates parsing correctness
-- Ensures blank/malformed detection
-- Verifies ingestion invariants
+Key properties:
 
-## Analysis Tests
-- Validates log level counting
-- Message frequency tracking
-
-## Edge Case Tests
-- Handles malformed-only logs
-- Ensures system stability under noisy input
-
-## Rendering Tests
-- Validates CLI output structure
-- Ensures correct formatting of:
-  - headers
-  - log summaries
-  - alert blocks
-
-## Integration Test
-- End-to-end pipeline validation:
-  - ingestion → analysis → rules → rendering
+- deterministic output
+- reproducible behavior
+- full edge-case coverage
+- automated validation across layers
 
 ---
 
 # Usage
-
 ```bash
-python pylog.py sample.log
+python -m pylog.cli sample.log
 ```
 
-## Example Input
+Example Input
 ```text
 2026-06-12 INFO Login successful
 2026-06-12 ERROR Failed login
 2026-06-12 WARNING Low disk space
 ```
-
-## Full CLI Output
 
 <details>
 <summary>Expand full output</summary>
@@ -176,66 +172,67 @@ Ingestion Summary
 ------------------------------------
 Ingestion: 3 lines (100% clean, 0 skipped)
 ```
-
 </details>
-
-
-## Testing
-
-All core functionality is validated through pytest, including ingestion edge cases, rule evaluation, and full pipeline integration.
-
-Run the full test suite: 
-
-```bash
-pytest
-```
 
 ---
 
 # Design Decisions
-
 ## Separation of Concerns
+
 Each layer has a single responsibility:
-- ingestion → parsing
+
+- ingestion → parsing and validation
 - analysis → aggregation
 - rules → detection
 - rendering → formatting
 
+## Deterministic Pipeline
 
-## Deterministic Output
 All outputs are:
+
 - testable
 - reproducible
 - structured
 
+---
 
-## Test-Driven Development
-Core functionality is fully validated using pytest before release.
+# Tech Stack
 
+- Python 3.10+
+- pytest
+- CLI (argparse-style execution)
+- modular package structure
 
-## Design Tradeoffs
+---
 
-- Chose a layered architecture to enforce separation of concerns over a monolithic parser design.
-- Prioritized deterministic outputs to enable reliable testing.
-- Opted for structured CLI output over flexible formatting for simplicity and stability.
+# Status
+
+PyLog v1.1.1 — Stable Release
+
+- ingestion robustness fixed (blank and malformed lines)
+- CLI stabilized
+- full test suite passing
+- modular package structure complete
 
 ---
 
 # Future Improvements
 
-- config file support (thresholds, filters)
-- JSON log ingestion support
-- streaming log processing for large files
-- CLI argument interface (argparse)
-- richer alert rule system
+- streaming log ingestion
+- config-driven rule engine
+- JSON and CSV export expansion
+- plugin-based rule system
+- performance optimization for large logs
 
 ---
 
 # What this project demonstrates
 
-- Building a modular, test-driven data processing pipeline
-- Designing CLI tools with predictable structured output
-- Writing robust tests for ingestion, logic, and rendering layers
+- layered system architecture
+- deterministic data pipelines
+- test-driven development
+- CLI tool design
+- modular Python packaging
 
 ---
 
@@ -243,11 +240,5 @@ Core functionality is fully validated using pytest before release.
 
 This project was built to simulate a production-style log processing pipeline with strict separation between ingestion, analysis, rule evaluation, and rendering. The goal was to focus on correctness, testability, and predictable CLI behavior rather than relying on external logging frameworks.
 
----
 
 
-# Status
-
-**Current Version:** v1.1.1  
-**State:** Stable  
-**Last Update:** Ingestion robustness improvements (blank + malformed line handling)
